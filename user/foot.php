@@ -12,6 +12,16 @@
 </div>
 
 <script src="<?php echo $cdnpublic?>jquery/3.4.1/jquery.min.js"></script>
+<script>
+$(function(){
+  $.ajaxSetup({
+    beforeSend: function(xhr) {
+      var token = $("input[name='csrf_token']").val() || <?php echo json_encode($_SESSION['csrf_token'] ?? '')?>;
+      if (token) xhr.setRequestHeader('X-CSRF-TOKEN', token);
+    }
+  });
+});
+</script>
 <script src="<?php echo $cdnpublic?>twitter-bootstrap/3.4.1/js/bootstrap.min.js"></script>
 <script src="./assets/js/ui-load.js"></script>
 <script src="./assets/js/ui-jp.config.js"></script>

@@ -17,8 +17,8 @@ if(!defined('IN_PLUGIN'))exit();
 			<div class="weui_msg">
 				<div class="weui_icon_area"><i class="weui_icon_success weui_icon_msg"></i></div>
 				<div class="weui_text_area">
-					<h2 class="weui_msg_title">支付成功</h2>
-					<p class="weui_msg_desc">支付成功，请回到浏览器查看订单</p>
+					<h2 class="weui_msg_title">已完成支付</h2>
+					<p class="weui_msg_desc">该订单已支付成功，请勿重复支付</p>
 				</div>
 				<div class="weui_opr_area">
 					<p class="weui_btn_area">

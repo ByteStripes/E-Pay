@@ -61,11 +61,11 @@ function loadmsg() {
 				layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.01,time: 15000});
 				window.location.href=<?php echo $redirect_url?>;
 			}else{
-				setTimeout("loadmsg()", 2000);
+				setTimeout(loadmsg, 2000);
 			}
 		},
 		error: function () {
-			setTimeout("loadmsg()", 2000);
+			setTimeout(loadmsg, 2000);
 		}
 	});
 }

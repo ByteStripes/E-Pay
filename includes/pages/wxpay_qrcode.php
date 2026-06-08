@@ -116,11 +116,11 @@ if(!defined('IN_PLUGIN'))exit();
 					layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.1,time: 15000});
                     window.location.href=data.backurl;
                 }else{
-                    setTimeout("loadmsg()", 2000);
+                    setTimeout(loadmsg, 2000);
                 }
             },
             error: function () {
-                setTimeout("loadmsg()", 2000);
+                setTimeout(loadmsg, 2000);
             }
         });
     }
@@ -136,7 +136,7 @@ if(!defined('IN_PLUGIN'))exit();
 			$('.mobile-btn').show();
             $('.mobile-tip').show();
 		}
-		setTimeout("loadmsg()", 2000);
+		setTimeout(loadmsg, 2000);
 	}
 </script>
 </body>

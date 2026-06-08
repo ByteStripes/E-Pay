@@ -62,7 +62,13 @@ function getChapter(url) {
 		success: function (result) {
 			try {
 				var resultElement = $(result);
-				$('#article-content').html(resultElement.find('#article-content').html());
+				var articleContent = resultElement.find('#article-content');
+				articleContent.find('script').remove();
+				var articleHtml = articleContent.html();
+				if (void 0 === articleHtml) {
+					throw new Error('Article content not found');
+				}
+				$('#article-content').html(articleHtml);
 				onContentChange();
 				var hash = location.hash;
 				if (hash.length > 0) {
@@ -108,7 +114,11 @@ function initTree(data) {
 		var treeObj = $("#treeDirectory");
 		$.fn.zTree.init(treeObj, ajaxSetting, data);
 		menuTree = $.fn.zTree.getZTreeObj("treeDirectory");
-		var nodes = menuTree.getNodesByParam('url', location.pathname + location.hash, null);
+		var currentUrl = location.pathname.split('/').pop() || 'index.html';
+		var nodes = menuTree.getNodesByParam('url', currentUrl + location.hash, null);
+		if (nodes.length === 0) {
+			nodes = menuTree.getNodesByParam('url', currentUrl, null);
+		}
 		if (nodes.length > 0) {
 			if (nodes.length > 1) {
 				if (menuTree.getSelectedNodes().length > 0) {
@@ -117,7 +127,7 @@ function initTree(data) {
 			}
 			menuTree.selectNode(nodes[0]);
 		}
-		else {
+		else if (typeof currentCatalog !== 'undefined' && currentCatalog.id) {
 			menuTree.selectNode(menuTree.getNodeByParam('id', currentCatalog.id, null));
 		}
 	}

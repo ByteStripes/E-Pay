@@ -2,23 +2,28 @@
     "packages": [
         {
             "name": "cccyun/alipay-sdk",
-            "version": "1.7",
-            "version_normalized": "1.7.0.0",
+            "version": "1.10",
+            "version_normalized": "1.10.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/netcccyun/alipay-sdk-php.git",
-                "reference": "930f85d3f7ff31f53d64e8b39093b0bc24d51ed8"
+                "reference": "17987367ddecdc67b7a2b995ab896d711b464e72"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/netcccyun/alipay-sdk-php/zipball/930f85d3f7ff31f53d64e8b39093b0bc24d51ed8",
-                "reference": "930f85d3f7ff31f53d64e8b39093b0bc24d51ed8",
+                "url": "https://api.github.com/repos/netcccyun/alipay-sdk-php/zipball/17987367ddecdc67b7a2b995ab896d711b464e72",
+                "reference": "17987367ddecdc67b7a2b995ab896d711b464e72",
                 "shasum": ""
             },
             "require": {
+                "ext-bcmath": "*",
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "ext-openssl": "*",
                 "php": ">=7.1"
             },
-            "time": "2024-03-01T02:22:04+00:00",
+            "time": "2026-03-16T04:54:47+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -43,29 +48,29 @@
             ],
             "support": {
                 "issues": "https://github.com/netcccyun/alipay-sdk-php/issues",
-                "source": "https://github.com/netcccyun/alipay-sdk-php/tree/1.7"
+                "source": "https://github.com/netcccyun/alipay-sdk-php/tree/1.10"
             },
             "install-path": "../cccyun/alipay-sdk"
         },
         {
             "name": "cccyun/qqpay-sdk",
-            "version": "1.2",
-            "version_normalized": "1.2.0.0",
+            "version": "1.3",
+            "version_normalized": "1.3.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/netcccyun/qqpay-sdk-php.git",
-                "reference": "873e1d9f06f3cecdbad165fa921096437cc8bcbe"
+                "reference": "9c84c698daba6fb733b5d6b7ad576dc3a4f72085"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/netcccyun/qqpay-sdk-php/zipball/873e1d9f06f3cecdbad165fa921096437cc8bcbe",
-                "reference": "873e1d9f06f3cecdbad165fa921096437cc8bcbe",
+                "url": "https://api.github.com/repos/netcccyun/qqpay-sdk-php/zipball/9c84c698daba6fb733b5d6b7ad576dc3a4f72085",
+                "reference": "9c84c698daba6fb733b5d6b7ad576dc3a4f72085",
                 "shasum": ""
             },
             "require": {
                 "php": ">=7.1"
             },
-            "time": "2023-04-02T02:46:22+00:00",
+            "time": "2026-03-16T04:57:40+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -91,29 +96,34 @@
             ],
             "support": {
                 "issues": "https://github.com/netcccyun/qqpay-sdk-php/issues",
-                "source": "https://github.com/netcccyun/qqpay-sdk-php/tree/1.2"
+                "source": "https://github.com/netcccyun/qqpay-sdk-php/tree/1.3"
             },
             "install-path": "../cccyun/qqpay-sdk"
         },
         {
             "name": "cccyun/wechatpay-sdk",
-            "version": "1.7",
-            "version_normalized": "1.7.0.0",
+            "version": "1.11",
+            "version_normalized": "1.11.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/netcccyun/wechatpay-sdk-php.git",
-                "reference": "c8912fd1af1f57a566d662433de2b23a72f8b2e7"
+                "reference": "2403c7118ea8fd7ffea73efd4254d4552338e94a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/netcccyun/wechatpay-sdk-php/zipball/c8912fd1af1f57a566d662433de2b23a72f8b2e7",
-                "reference": "c8912fd1af1f57a566d662433de2b23a72f8b2e7",
+                "url": "https://api.github.com/repos/netcccyun/wechatpay-sdk-php/zipball/2403c7118ea8fd7ffea73efd4254d4552338e94a",
+                "reference": "2403c7118ea8fd7ffea73efd4254d4552338e94a",
                 "shasum": ""
             },
             "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "ext-libxml": "*",
+                "ext-openssl": "*",
+                "ext-simplexml": "*",
                 "php": ">=7.1"
             },
-            "time": "2023-12-28T08:50:42+00:00",
+            "time": "2026-03-16T04:56:37+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -139,7 +149,7 @@
             ],
             "support": {
                 "issues": "https://github.com/netcccyun/wechatpay-sdk-php/issues",
-                "source": "https://github.com/netcccyun/wechatpay-sdk-php/tree/1.7"
+                "source": "https://github.com/netcccyun/wechatpay-sdk-php/tree/1.11"
             },
             "install-path": "../cccyun/wechatpay-sdk"
         },
@@ -350,6 +360,6 @@
             "install-path": "../mdanter/ecc"
         }
     ],
-    "dev": true,
+    "dev": false,
     "dev-package-names": []
 }

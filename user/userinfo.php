@@ -68,6 +68,7 @@ if(!$conf['apiurl'])$conf['apiurl'] = $siteurl;
 		<div class="tab-pane ng-scope active">
 <?php if($mod=='api'){?>
 			<form class="form-horizontal devform">
+				<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']?>">
 				<div class="form-group">
 					<label class="col-sm-2 control-label">接口地址</label>
 					<div class="col-sm-9">
@@ -125,6 +126,7 @@ if(!$conf['apiurl'])$conf['apiurl'] = $siteurl;
 			</form>
 <?php }elseif($mod=='account'){?>
 			<form class="form-horizontal devform">
+				<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']?>">
 				<div class="form-group"><div class="col-sm-offset-2 col-sm-4"><h4>修改登录密码：</h4></div></div>
 				<?php if(!empty($userrow['pwd'])){?>
 				<div class="form-group">
@@ -191,11 +193,12 @@ $(document).ready(function(){
 		if(newpwd==''||newpwd2==''){layer.alert('新密码不能为空');return false;}
 		if(newpwd!=newpwd2){layer.alert('两次输入密码不一致！');return false;}
 		if(oldpwd==newpwd){layer.alert('旧密码和新密码相同！');return false;}
+		var csrf_token=$("input[name='csrf_token']").val();
 		var ii = layer.load(2, {shade:[0.1,'#fff']});
 		$.ajax({
 			type : "POST",
 			url : "ajax2.php?act=edit_pwd",
-			data : {oldpwd:oldpwd,newpwd:newpwd,newpwd2:newpwd2},
+			data : {oldpwd:oldpwd,newpwd:newpwd,newpwd2:newpwd2,csrf_token:csrf_token},
 			dataType : 'json',
 			success : function(data) {
 				layer.close(ii);
@@ -209,11 +212,12 @@ $(document).ready(function(){
 	});
 	$("#editKeyType").click(function(){
 		var keytype=$("select[name='keytype']").val();
+		var csrf_token=$("input[name='csrf_token']").val();
 		var ii = layer.load(2, {shade:[0.1,'#fff']});
 		$.ajax({
 			type : "POST",
 			url : "ajax2.php?act=edit_keytype",
-			data : {keytype:keytype},
+			data : {keytype:keytype,csrf_token:csrf_token},
 			dataType : 'json',
 			success : function(data) {
 				layer.close(ii);
@@ -230,10 +234,11 @@ function resetKey(){
 	var confirmobj = layer.confirm('是否确认重置对接密钥？重置后需要重新登录', {
 	  btn: ['确定','取消']
 	}, function(){
+		var csrf_token=$("input[name='csrf_token']").val();
 		$.ajax({
 			type : 'POST',
 			url : 'ajax2.php?act=resetKey',
-			data : 'submit=do',
+			data : {submit:'do',csrf_token:csrf_token},
 			dataType : 'json',
 			success : function(data) {
 				if(data.code == 0){
@@ -255,10 +260,11 @@ function createRsaPair(){
 	var confirmobj = layer.confirm('是否确定生成商户RSA密钥对？', {
 	  btn: ['确定','取消']
 	}, function(){
+		var csrf_token=$("input[name='csrf_token']").val();
 		$.ajax({
 			type : 'POST',
 			url : 'ajax2.php?act=createRsaPair',
-			data : 'submit=do',
+			data : {submit:'do',csrf_token:csrf_token},
 			dataType : 'json',
 			success : function(data) {
 				if(data.code == 0){

@@ -185,7 +185,8 @@ case 'delChannel':
 	if($DB->find('psreceiver', '*', ['channel'=>$id])){
 		exit('{"code":-1,"msg":"当前支付通道下有分账规则，需要先删除"}');
 	}
-	if($DB->find('applychannel', '*', ['channel'=>$id])){
+	$has_applychannel = $DB->getColumn("SHOW TABLES LIKE :table", [':table'=>DBQZ.'_applychannel']);
+	if($has_applychannel && $DB->find('applychannel', '*', ['channel'=>$id])){
 		exit('{"code":-1,"msg":"当前支付通道关联了进件渠道，无法删除"}');
 	}
 	if($DB->exec("DELETE FROM pre_channel WHERE id=:id", [':id'=>$id])){

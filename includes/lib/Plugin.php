@@ -66,6 +66,14 @@ class Plugin {
 				}
 			}
 
+			if($order && in_array(intval($order['status']), [1, 2, 3], true)){
+				$callback_funcs = ['notify', 'return', 'preauthnotify', 'signnotify', 'appgw', 'webhook'];
+				if(!in_array($func, $callback_funcs, true)){
+					if(!defined("IN_PLUGIN")) define("IN_PLUGIN", true);
+					return ['type'=>'page','page'=>intval($order['status']) == 2 ? 'error' : 'ok'];
+				}
+			}
+
 			if($order && $func=='checkpay'){
 				$selfurl = is_self_url($order['payurl']);
 				if($conf['wxpay_qrpaylogin'] == 1 && !$selfurl && checkwechat()){

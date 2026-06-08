@@ -418,7 +418,7 @@
                         $.cookie('fastpay_name', $('#cardholder-name').val(), {expires: 365, path: '/'});
                         $.cookie('fastpay_idcard', $('#id-number').val(), {expires: 365, path: '/'});
                         layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.1,time: 15000});
-					    setTimeout(window.location.href=response.backurl, 1000);
+					    setTimeout(function(){ window.location.href = response.backurl; }, 1000);
                     } else {
                         layer.alert(response.msg, {icon: 2});
                     }
@@ -466,7 +466,7 @@
             success: function (data) {
                 if (data.code == 1) {
 					layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.1,time: 15000});
-					setTimeout(window.location.href=data.backurl, 1000);
+					setTimeout(function(){ window.location.href = data.backurl; }, 1000);
                 }
             }
         });

@@ -118,6 +118,7 @@ $_SESSION['csrf_token'] = $csrf_token;
 <script src="<?php echo $cdnpublic?>jsencrypt/3.5.4/jsencrypt.min.js"></script>
 <script src="//static.geetest.com/static/tools/gt.js"></script>
 <script>
+$.ajaxSetup({ headers: { 'X-CSRF-TOKEN': '<?php echo $csrf_token?>' } });
 window.appendChildOrg = Element.prototype.appendChild;
 Element.prototype.appendChild = function() {
     if(arguments[0].tagName == 'SCRIPT'){
