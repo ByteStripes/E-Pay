@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS epay DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+CREATE USER IF NOT EXISTS 'epay'@'localhost' IDENTIFIED WITH mysql_native_password BY 'Epay@2026';
+CREATE USER IF NOT EXISTS 'epay'@'127.0.0.1' IDENTIFIED WITH mysql_native_password BY 'Epay@2026';
+ALTER USER 'epay'@'localhost' IDENTIFIED WITH mysql_native_password BY 'Epay@2026';
+ALTER USER 'epay'@'127.0.0.1' IDENTIFIED WITH mysql_native_password BY 'Epay@2026';
+GRANT ALL PRIVILEGES ON epay.* TO 'epay'@'localhost';
+GRANT ALL PRIVILEGES ON epay.* TO 'epay'@'127.0.0.1';
+GRANT SHUTDOWN ON *.* TO 'epay'@'localhost';
+GRANT SHUTDOWN ON *.* TO 'epay'@'127.0.0.1';
+FLUSH PRIVILEGES;
