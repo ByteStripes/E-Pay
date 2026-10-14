@@ -405,7 +405,7 @@ elseif($_GET['do']=='transfer'){
 				echo '商户'.$row['uid'].'成功结算'.$realmoney.'元，但记录插入失败<br/>';
 			}
 		}else{
-			changeUserMoney($row['uid'], $row['money'], true, '结算失败退回', $out_biz_no);else{
+			changeUserMoney($row['uid'], $row['money'], true, '结算失败退回', $out_biz_no);
 			echo '商户'.$row['uid'].'结算'.$realmoney.'元失败：'.$result['msg'].'<br/>';
 			if(!in_array($result['errcode'], $payee_err_code)){
 				$DB->exec("UPDATE pre_channel SET status=0 WHERE id=:id", [':id'=>$channel['id']]);
