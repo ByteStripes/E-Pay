@@ -4,45 +4,117 @@ E-Pay 是一套支付聚合网关。商户通过本系统收款，系统再把�
 
 管理后台给运营人员用，商户面板给接入方用，支付页面给付款人用。
 
-## Quick Start
+## 功能概览
 
-下面这几步可以在一台新机器上把站点跑起来。示例假设网站根目录就是本仓库，数据库名为 `epay`，表前缀为 `pay`。
+- 多通道聚合：微信、支付宝、QQ 钱包等 60+ 支付插件
+- 商户管理：商户注册、密钥管理、余额结算
+- 订单系统：统一下单、页面跳转、异步通知、退款代付
+- 风控策略：黑名单、金额校验、IP 限制
+- 分销返现：多级邀请返现、按比例扣回
+- 定时任务：补单、通知重试、结算生成、分账
+- 多模板支持：11 套首页模板可切换
 
-### 1. 环境
+## 环境要求
 
 | 项目 | 要求 |
 | --- | --- |
 | PHP | 7.4 及以上，建议 8.0 及以上 |
-| 扩展 | `pdo_mysql`、`curl`、`openssl`、`sodium`、`gd` |
-| 数据库 | MySQL 5.7+ / MariaDB，字符集 `utf8mb4` |
+| 扩展 | `pdo_pgsql`、`curl`、`openssl`、`sodium`、`gd`、`mbstring`、`xml`、`zip` |
+| 数据库 | PostgreSQL 12+，字符集 `UTF8` |
 | Web 服务器 | Nginx 或 IIS，需要重写规则 |
 
 `sodium` 用来加密登录凭证。没有这个扩展时，后台登录会失败。
 
-### 2. 放置代码并设置权限
+## 快速启动
 
-把代码放到网站根目录。运行 PHP 的系统用户需要能写入：
+以下步骤可在一台新机器上完成部署。示例假设域名为 `epay.example.com`，数据库名为 `epay`，表前缀为 `pay`。
+
+### 1. 安装依赖
+
+```bash
+# Debian / Ubuntu
+apt-get install -y php8.2 php8.2-fpm php8.2-pgsql php8.2-curl php8.2-gd php8.2-mbstring php8.2-xml php8.2-zip
+apt-get install -y postgresql nginx
+```
+
+### 2. 准备数据库
+
+```bash
+sudo -u postgres psql -c "CREATE USER epay WITH PASSWORD '请换成强密码';"
+sudo -u postgres psql -c "CREATE DATABASE epay OWNER epay ENCODING 'UTF8';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE epay TO epay;"
+```
+
+### 3. 放置代码并设置权限
+
+```bash
+git clone git@github.com:ByteStripes/E-Pay.git /opt/E-Pay
+chown -R www-data:www-data /opt/E-Pay
+chmod -R 775 /opt/E-Pay
+```
+
+运行 PHP 的系统用户需要能写入：
 
 - 网站根目录（安装程序要生成 `config.php`）
 - `install/`（安装结束后写入 `install.lock`）
 
-不要把 `config.php` 提交到仓库。里面是数据库账号。
+不要把 `config.php` 提交到仓库。里面是数据库账号。`.gitignore` 已排除该文件。
 
-### 3. 准备数据库
+### 4. 配置 Nginx
 
-```sql
-CREATE DATABASE epay DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-CREATE USER 'epay'@'127.0.0.1' IDENTIFIED BY '请换成强密码';
-GRANT ALL PRIVILEGES ON epay.* TO 'epay'@'127.0.0.1';
-FLUSH PRIVILEGES;
+把下面的规则放到站点的 `server` 里。`root` 指到本仓库。完整片段也写在仓库根目录的 `nginx.txt`。
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name epay.example.com;
+    root /opt/E-Pay;
+    index index.php index.html;
+
+    client_max_body_size 20m;
+
+    location / {
+        if (!-e $request_filename) {
+            rewrite ^/(.[a-zA-Z0-9\-\_]+).html$ /index.php?mod=$1 last;
+        }
+        rewrite ^/pay/(.*)$ /pay.php?s=$1 last;
+        rewrite ^/api/(.*)$ /api.php?s=$1 last;
+        rewrite ^/doc/(.[a-zA-Z0-9\-\_]+).html$ /index.php?doc=$1 last;
+    }
+
+    location ^~ /plugins {
+        deny all;
+    }
+    location ^~ /includes {
+        deny all;
+    }
+    location ^~ /install {
+        deny all;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(ht|git|env) {
+        deny all;
+    }
+}
 ```
 
-### 4. 用浏览器安装
+`/plugins` 和 `/includes` 必须禁止从网上直接访问，否则插件日志和库文件会暴露。站点上线后，`/install` 也应禁止外网访问；需要重装时再临时打开，并先删掉 `install/install.lock`。
 
-1. 配置好下面的重写规则后，打开 `https://你的域名/install/`。
+IIS 的对应规则在 `IIS.txt`。
+
+### 5. 用浏览器安装
+
+1. 配置好 Nginx 重写规则后，打开 `https://你的域名/install/`。
 2. 环境检测通过后，填写数据库主机、端口、用户名、密码、库名。表前缀保持 `pay`。
-3. 安装数据表。已经装过、只想沿用旧表时，可以选择跳过建表。全新安装会清空该库里的本系统数据。
-4. 安装完成会生成 `install/install.lock`。没有这个文件时，网站拒绝工作，避免别人再次执行安装。
+3. 安装数据表。全新安装会清空该库里的本系统数据。
+4. 安装完成会生成 `install/install.lock`。没有这个文件时，网站拒绝工作。
 
 装好后的入口：
 
@@ -54,41 +126,26 @@ FLUSH PRIVILEGES;
 
 第一次登录后台后立刻修改管理员密码。默认密码只适合安装当天。
 
-### 5. Nginx
+### 6. 配置 HTTPS
 
-把下面的规则放到站点的 `server` 里。`root` 指到本仓库。完整片段也写在仓库根目录的 `nginx.txt`。
+使用 Certbot 申请 Let's Encrypt 免费证书：
 
-```nginx
-location / {
-    if (!-e $request_filename) {
-        rewrite ^/(.[a-zA-Z0-9\-\_]+).html$ /index.php?mod=$1 last;
-    }
-    rewrite ^/pay/(.*)$ /pay.php?s=$1 last;
-    rewrite ^/api/(.*)$ /api.php?s=$1 last;
-    rewrite ^/doc/(.[a-zA-Z0-9\-\_]+).html$ /index.php?doc=$1 last;
-}
-location ^~ /plugins {
-    deny all;
-}
-location ^~ /includes {
-    deny all;
-}
-location ^~ /install {
-    deny all;
-}
+```bash
+apt-get install -y certbot python3-certbot-nginx
+certbot --nginx -d epay.example.com --non-interactive --agree-tos --register-unsafely-without-email --redirect
 ```
 
-`/plugins` 和 `/includes` 必须禁止从网上直接访问，否则插件日志和库文件会暴露。站点上线后，`/install` 也应禁止外网访问；需要重装时再临时打开，并先删掉 `install/install.lock`。
+HTTPS 是必须的。登录 Cookie 在 HTTPS 下会带 `Secure` 标记。
 
-IIS 的对应规则在 `IIS.txt`。
-
-### 6. 定时任务
+### 7. 配置定时任务
 
 后台「系统设置」里先设置监控密钥。然后每分钟访问一次：
 
-```text
-https://你的域名/cron.php?key=监控密钥&do=order
-https://你的域名/cron.php?key=监控密钥&do=notify
+```bash
+crontab -e
+# 添加以下两行
+* * * * * curl -s -o /dev/null 'https://你的域名/cron.php?key=监控密钥&do=order'
+* * * * * curl -s -o /dev/null 'https://你的域名/cron.php?key=监控密钥&do=notify'
 ```
 
 常用的 `do`：
@@ -105,37 +162,68 @@ https://你的域名/cron.php?key=监控密钥&do=notify
 
 计划任务建议只从服务器本机或你填写的「服务器 IP」触发。密钥不要出现在对外文档里。
 
-### 7. 接一笔测试支付
+### 8. 安装后检查
 
-1. 后台添加一个支付通道，并启用对应插件。
-2. 注册一个商户，或在后台开通商户，记下商户 ID 和密钥。
-3. 在商户面板把收款方式打开。
-4. 用商户密钥调用统一下单或页面跳转支付。接口说明在站点的 `/doc/` 页面。
-5. 用通道的沙箱或小额真实付款走通：下单、支付、异步通知、商户回调。
+安装完成后，如果管理后台报 500 错误并提示 `session_salt 未设置`，请手动执行：
 
-页面跳转支付和统一下单的地址形如：
+```bash
+# 生成随机 salt 并写入数据库
+SALT=$(openssl rand -hex 32)
+sudo -u postgres psql -d epay -c "INSERT INTO pay_config (k, v) VALUES ('session_salt', '${SALT}') ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v;"
 
-```text
-https://你的域名/submit.php
-https://你的域名/mapi.php
-https://你的域名/api/pay/create
+# 清除配置缓存
+sudo -u postgres psql -d epay -c "UPDATE pay_cache SET v = '' WHERE k = 'config';"
 ```
 
-新接入的商户请使用 RSA 签名，并带上 5 分钟内的 `timestamp`。文档页有签名步骤。
+## 部署说明
 
-## 目录
+### 从 MariaDB/MySQL 迁移到 PostgreSQL
+
+本版本已将数据库层从 MySQL/MariaDB 迁移到 PostgreSQL。如果从旧版本升级：
+
+1. 在 PostgreSQL 中创建数据库和用户（见上方步骤 2）
+2. 更新 `config.php` 中的连接参数：
+
+```php
+<?php
+$dbconfig=array(
+    'host' => '127.0.0.1',
+    'port' => 5432,
+    'user' => 'epay',
+    'pwd' => '你的密码',
+    'dbname' => 'epay',
+    'dbqz' => 'pay'
+);
+```
+3. 删除 `install/install.lock`，重新运行安装向导
+4. 安装完成后检查 `session_salt` 是否已设置（见上方步骤 8）
+
+### 安全加固
+
+- `config.php` 和 `install/install.lock` 已通过 `.gitignore` 排除，不会提交到仓库
+- `/plugins`、`/includes`、`/install` 路径已在 Nginx 中禁止外网访问
+- HTTPS 强制跳转已通过 Certbot 配置
+- 后台默认密码 `123456` 必须在安装后立即修改
+- `session_salt` 未设置时程序拒绝启动
+- 用户 IP 获取方式默认为直连地址，不信任可伪造的 `X-Forwarded-For`
+
+## 目录结构
 
 | 路径 | 内容 |
 | --- | --- |
 | `admin/` | 管理后台 |
 | `user/` | 商户面板 |
-| `plugins/` | 支付通道插件 |
+| `plugins/` | 支付通道插件（60+） |
 | `includes/` | 公共库、入账、退款、代付 |
 | `pay.php` | 付款页、渠道回调入口 |
 | `api.php` / `mapi.php` | 商户接口 |
 | `cron.php` | 定时任务 |
 | `install/` | 安装向导 |
-| `template/` | 首页模板 |
+| `template/` | 首页模板（11 套） |
+| `paypage/` | 支付页面 |
+| `assets/` | 前端静态资源 |
+| `_deploy/` | 部署辅助脚本 |
+| `docs/` | 文档 |
 
 ## 上线前检查
 
@@ -155,7 +243,7 @@ proxy_set_header X-Forwarded-Proto $scheme;
 - `api.php?act=query` 不再返回商户密钥。旧的「把密钥放在网址里」的查询、退款接口仍然保留，供旧商户使用，新商户不要用。订单查询如果走系统签名，必须带 5 分钟内的时间戳。
 - 统一下单里的 `clientip` 由商户填写，只能作为买家 IP 的记录。黑名单会同时看这个地址和商户服务器实际连进来的地址。单靠商户上报的 IP 不能当作防盗刷的唯一手段，请同时设置商户日限额。
 
-## 支付结果怎么入账
+## 支付结果入账
 
 渠道通知验签通过后，才会把订单标成已支付，并按订单里的商户所得增加余额，然后再通知商户。
 
@@ -165,8 +253,9 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 代付会先扣余额并记下「处理中」，再请求通道。通道明确失败时，余额按该笔代付只退回一次。
 
-## 开发时注意
+## 开发注意事项
 
 - 业务改动不要绕过 `includes/functions.php` 里的 `processNotify` / `processReturn`。新插件入账时请传入实付金额（单位：元）。金额不一致时这两个函数不会加余额。
 - 不要在持有数据库事务时访问支付通道。代付已经先记账、后请求通道。
 - 插件目录下的 `logs/` 不要对公网开放。Nginx 已用 `deny all` 挡住整个 `plugins` 目录。
+- 数据库使用 PostgreSQL，SQL 语句使用 `ON CONFLICT` 语法替代 `ON DUPLICATE KEY UPDATE`。
