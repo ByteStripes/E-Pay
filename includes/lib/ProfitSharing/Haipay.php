@@ -129,7 +129,7 @@ class Haipay implements IProfitSharing
     public function addReceiver($account, $name = null){
         global $DB;
         return ['code'=>0, 'msg'=>'添加分账接收方成功'];
-        if($DB->getRow("SHOW TABLES LIKE 'pre_haipay_relation'")){
+        if($DB->getRow("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='pre_haipay_relation'")){
             if($DB->find("haipay_relation", ['account'=>$account])){
                 return ['code'=>0, 'msg'=>'添加分账接收方成功'];
             }

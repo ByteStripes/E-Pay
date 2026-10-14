@@ -22,7 +22,7 @@ case 'getcount':
 		\lib\Plugin::updateAll();
 	}
 
-	$orderrow=$DB->getRow("SELECT COUNT(*) allnum,COUNT(IF(status>0, 1, NULL)) sucnum FROM pre_order WHERE addtime>=:thtime", [':thtime'=>$thtime]);
+	$orderrow=$DB->getRow("SELECT COUNT(*) allnum,COUNT(CASE WHEN status>0 THEN 1 ELSE NULL END) sucnum FROM pre_order WHERE addtime>=:thtime", [':thtime'=>$thtime]);
 	$success_rate = 100;
 	if($orderrow){
 		if($orderrow['allnum'] > 0){

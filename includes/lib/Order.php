@@ -13,9 +13,11 @@ class Order
         $channel = \lib\Channel::get($row['channel']);
         if($channel['mode']==1)
             return ['code'=>-1, 'msg'=>'当前支付通道为商户直清，不支持冻结'];
+        if(!$DB->exec("UPDATE pre_order SET status=3 WHERE trade_no=:trade_no AND status=1", [':trade_no'=>$trade_no])){
+            return ['code'=>-1, 'msg'=>'订单状态已变更，请勿重复冻结'];
+        }
         if($row['getmoney']>0){
             changeUserMoney($row['uid'], $row['getmoney'], false, '订单冻结', $trade_no);
-            $DB->update('order', ['status'=>3], ['trade_no'=>$trade_no]);
         }
         return ['code'=>0, 'msg'=>'已成功从UID:'.$row['uid'].'冻结'.$row['getmoney'].'元余额'];
     }
@@ -30,9 +32,11 @@ class Order
         $channel = \lib\Channel::get($row['channel']);
         if($channel['mode']==1)
             return ['code'=>-1, 'msg'=>'当前支付通道为商户直清，不支持冻结'];
+        if(!$DB->exec("UPDATE pre_order SET status=1 WHERE trade_no=:trade_no AND status=3", [':trade_no'=>$trade_no])){
+            return ['code'=>-1, 'msg'=>'订单状态已变更，请勿重复解冻'];
+        }
         if($row['getmoney']>0){
             changeUserMoney($row['uid'], $row['getmoney'], true, '订单解冻', $trade_no);
-            $DB->update('order', ['status'=>1], ['trade_no'=>$trade_no]);
         }
         return ['code'=>0, 'msg'=>'已成功为UID:'.$row['uid'].'恢复'.$row['getmoney'].'元余额'];
     }

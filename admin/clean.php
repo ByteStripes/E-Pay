@@ -26,59 +26,59 @@ showmsg('清理系统设置缓存成功！',1);
 }elseif($mod=='cleanorder' && $_SERVER['REQUEST_METHOD']==='POST'){
 $cutoff = date("Y-m-d H:i:s",strtotime("-30 days"));
 $DB->exec("DELETE FROM `pre_order` WHERE addtime<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_order`");
+$DB->exec("VACUUM pre_order");
 showmsg('删除30天前订单记录成功！',1);
 }elseif($mod=='cleansettle' && $_SERVER['REQUEST_METHOD']==='POST'){
 $cutoff = date("Y-m-d H:i:s",strtotime("-30 days"));
 $DB->exec("DELETE FROM `pre_settle` WHERE addtime<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_settle`");
+$DB->exec("VACUUM pre_settle");
 showmsg('删除30天前结算记录成功！',1);
 }elseif($mod=='cleanrecord' && $_SERVER['REQUEST_METHOD']==='POST'){
 $cutoff = date("Y-m-d H:i:s",strtotime("-30 days"));
 $DB->exec("DELETE FROM `pre_record` WHERE date<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_record`");
+$DB->exec("VACUUM pre_record");
 showmsg('删除30天前资金明细成功！',1);
 }elseif($mod=='cleanorderi' && $_POST['do']=='submit'){
 $days = intval($_POST['days']);
 if($days<=0)showmsg('请确保每项不能为空',3);
 $cutoff = date("Y-m-d H:i:s",strtotime("-{$days} days"));
 $DB->exec("DELETE FROM `pre_order` WHERE addtime<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_order`");
+$DB->exec("VACUUM pre_order");
 showmsg('删除订单记录成功！',1);
 }elseif($mod=='cleansettlei' && $_POST['do']=='submit'){
 $days = intval($_POST['days']);
 if($days<=0)showmsg('请确保每项不能为空',3);
 $cutoff = date("Y-m-d H:i:s",strtotime("-{$days} days"));
 $DB->exec("DELETE FROM `pre_settle` WHERE addtime<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_settle`");
+$DB->exec("VACUUM pre_settle");
 showmsg('删除结算记录成功！',1);
 }elseif($mod=='cleanrecordi' && $_POST['do']=='submit'){
 $days = intval($_POST['days']);
 if($days<=0)showmsg('请确保每项不能为空',3);
 $cutoff = date("Y-m-d H:i:s",strtotime("-{$days} days"));
 $DB->exec("DELETE FROM `pre_record` WHERE date<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_record`");
+$DB->exec("VACUUM pre_record");
 showmsg('删除资金明细成功！',1);
 }elseif($mod=='cleantransferi' && $_POST['do']=='submit'){
 $days = intval($_POST['days']);
 if($days<=0)showmsg('请确保每项不能为空',3);
 $cutoff = date("Y-m-d H:i:s",strtotime("-{$days} days"));
 $DB->exec("DELETE FROM `pre_transfer` WHERE paytime<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_transfer`");
+$DB->exec("VACUUM pre_transfer");
 showmsg('删除付款记录成功！',1);
 }elseif($mod=='cleanpsorderi' && $_POST['do']=='submit'){
 $days = intval($_POST['days']);
 if($days<=0)showmsg('请确保每项不能为空',3);
 $cutoff = date("Y-m-d H:i:s",strtotime("-{$days} days"));
 $DB->exec("DELETE FROM `pre_psorder` WHERE addtime<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_psorder`");
+$DB->exec("VACUUM pre_psorder");
 showmsg('删除分账记录成功！',1);
 }elseif($mod=='cleanlogi' && $_POST['do']=='submit'){
 $days = intval($_POST['days']);
 if($days<=0)showmsg('请确保每项不能为空',3);
 $cutoff = date("Y-m-d H:i:s",strtotime("-{$days} days"));
 $DB->exec("DELETE FROM `pre_log` WHERE `date`<:cutoff", [':cutoff'=>$cutoff]);
-$DB->exec("OPTIMIZE TABLE `pre_log`");
+$DB->exec("VACUUM pre_log");
 showmsg('删除登录记录成功！',1);
 }else{
 ?>

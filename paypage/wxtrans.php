@@ -48,9 +48,9 @@ $result = \lib\Transfer::query('wxpay', $channel, $out_biz_no, '');
 if($result['code'] == 0){
     if($result['status'] == 2){
         if($type == 'transfer' && $row['status'] == 0){
-            $resCount = $DB->update('transfer', ['status'=>2, 'result'=>$result['errmsg']], ['biz_no' => $out_biz_no]);
+            $resCount = $DB->exec("UPDATE pre_transfer SET status=2, result=:errmsg WHERE biz_no=:biz_no AND status=0", [':errmsg'=>$result['errmsg'], ':biz_no'=>$out_biz_no]);
             if($row['uid'] > 0 && $resCount > 0){
-                changeUserMoney($row['uid'], $row['costmoney'], true, '代付退回');
+                changeUserMoney($row['uid'], $row['costmoney'], true, '代付退回', $out_biz_no);
             }
         }elseif($type == 'settle' && $row['transfer_status'] == 1){
             $DB->update('settle', ['transfer_status'=>2, 'transfer_result'=>$result['errmsg'], 'status'=>3, 'result'=>$result['errmsg']], ['id' => $row['id']]);

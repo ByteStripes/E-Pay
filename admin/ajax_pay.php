@@ -185,7 +185,7 @@ case 'delChannel':
 	if($DB->find('psreceiver', '*', ['channel'=>$id])){
 		exit('{"code":-1,"msg":"当前支付通道下有分账规则，需要先删除"}');
 	}
-	$has_applychannel = $DB->getColumn("SHOW TABLES LIKE :table", [':table'=>DBQZ.'_applychannel']);
+	$has_applychannel = $DB->getColumn("SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename=:table", [':table'=>DBQZ.'_applychannel']);
 	if($has_applychannel && $DB->find('applychannel', '*', ['channel'=>$id])){
 		exit('{"code":-1,"msg":"当前支付通道关联了进件渠道，无法删除"}');
 	}
@@ -529,7 +529,7 @@ break;
 case 'getSuccessRate':
 	$channel = intval($_GET['channel']);
 	$thtime = date("Y-m-d");
-	$orderrow=$DB->getRow("SELECT COUNT(*) allnum,COUNT(IF(status>0, 1, NULL)) sucnum FROM pre_order WHERE addtime>=:thtime AND channel=:channel", [':thtime'=>$thtime, ':channel'=>$channel]);
+	$orderrow=$DB->getRow("SELECT COUNT(*) allnum,COUNT(CASE WHEN status>0 THEN 1 ELSE NULL END) sucnum FROM pre_order WHERE addtime>=:thtime AND channel=:channel", [':thtime'=>$thtime, ':channel'=>$channel]);
 	$success_rate = $orderrow && $orderrow['allnum'] > 0 ? round($orderrow['sucnum']/$orderrow['allnum']*100,2) : 100;
 	exit('{"code":0,"msg":"succ","data":"' . $success_rate . '"}');
 break;

@@ -87,7 +87,7 @@ case 'orderList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_order A WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT A.*,B.plugin,B.name channelname FROM pre_order A LEFT JOIN pre_channel B ON A.channel=B.id WHERE{$sql} order by trade_no desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT A.*,B.plugin,B.name channelname FROM pre_order A LEFT JOIN pre_channel B ON A.channel=B.id WHERE{$sql} order by trade_no desc LIMIT $limit OFFSET $offset", $params);
 	$list2 = [];
 	foreach($list as $row){
 		$row['typename'] = $paytypes[$row['type']];
@@ -205,7 +205,7 @@ case 'riskList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_risk WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_risk WHERE{$sql} order by id desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_risk WHERE{$sql} order by id desc LIMIT $limit OFFSET $offset", $params);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -285,7 +285,7 @@ case 'apirefund': //API退款操作
 	$paypwd=trim($_POST['paypwd']);
 	$money = trim($_POST['money']);
 	if(!is_numeric($money) || !preg_match('/^[0-9.]+$/', $money))exit('{"code":-1,"msg":"金额输入错误"}');
-	if(!hash_equals($conf['admin_paypwd'], $paypwd))
+	if(!verifyAdminPayPwd($paypwd))
 		exit('{"code":-1,"msg":"支付密码输入错误！"}');
 	
 	$refund_no = date("YmdHis").random_int(11111,99999);
@@ -331,10 +331,11 @@ case 'fillorder': //手动补单
 	if(!$row)
 		exit('{"code":-1,"msg":"当前订单不存在！"}');
 	if($row['status']>0)exit('{"code":-1,"msg":"当前订单不是未完成状态！"}');
-	if($DB->exec("update `pre_order` set `status` ='1' where `trade_no`=:trade_no", [':trade_no'=>$trade_no])){
-		$DB->exec("update `pre_order` set `endtime` =:endtime,`date` =NOW() where `trade_no`=:trade_no", [':endtime'=>$date, ':trade_no'=>$trade_no]);
+	if($DB->exec("UPDATE pre_order SET status=1, endtime=:endtime, date=CURRENT_DATE WHERE trade_no=:trade_no AND status=0", [':endtime'=>$date, ':trade_no'=>$trade_no])){
 		$channel=\lib\Channel::get($row['channel']);
 		processOrder($row);
+	}else{
+		exit('{"code":-1,"msg":"订单状态已变更，请勿重复补单！"}');
 	}
 	exit('{"code":0,"msg":"补单成功"}');
 break;

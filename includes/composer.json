@@ -3,6 +3,10 @@
         "cccyun/alipay-sdk": "^1.1",
         "cccyun/wechatpay-sdk": "^1.0",
         "cccyun/qqpay-sdk": "^1.0",
-        "lpilp/guomi": "^1.0"
+        "lpilp/guomi": "^2.0",
+        "paragonie/ecc": "^2.0.4"
+    },
+    "replace": {
+        "mdanter/ecc": "2.0.4"
     }
 }

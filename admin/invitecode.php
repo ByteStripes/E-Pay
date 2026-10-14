@@ -77,7 +77,7 @@ if(!checkRefererHost())exit();
 echo '<div class="panel panel-primary">
 <div class="panel-heading w h"><h3 class="panel-title">清空邀请码</h3></div>
 <div class="panel-body box">';
-if($DB->query("DELETE FROM pre_invitecode WHERE 1")==true){
+if($DB->query("DELETE FROM pre_invitecode WHERE 1=1")==true){
 echo '<div class="box">清空成功.</div>';
 }else{
 echo'<div class="box">清空失败.</div>';
@@ -123,7 +123,7 @@ if(isset($_GET['kw'])) {
 	$con='包含 '.htmlspecialchars($kw, ENT_QUOTES, 'UTF-8').' 的共有 <b>'.$numrows.'</b> 个邀请码';
 }else{
 	$kw = null;
-	$numrows=$DB->getColumn("SELECT count(*) from pre_invitecode WHERE 1");
+	$numrows=$DB->getColumn("SELECT count(*) from pre_invitecode WHERE 1=1");
 	$con='系统共有 <b>'.$numrows.'</b> 个邀请码';
 }
 echo $con;
@@ -139,9 +139,9 @@ $page=isset($_GET['page'])?intval($_GET['page']):1;
 $offset=$pagesize*($page - 1);
 
 if($kw !== null){
-	$rs=$DB->query("SELECT * FROM pre_invitecode WHERE `code`=:kw order by id desc limit $offset,$pagesize", [':kw'=>$kw]);
+	$rs=$DB->query("SELECT * FROM pre_invitecode WHERE `code`=:kw order by id desc LIMIT $pagesize OFFSET $offset", [':kw'=>$kw]);
 }else{
-	$rs=$DB->query("SELECT * FROM pre_invitecode WHERE 1 order by id desc limit $offset,$pagesize");
+	$rs=$DB->query("SELECT * FROM pre_invitecode WHERE 1=1 order by id desc LIMIT $pagesize OFFSET $offset");
 }
 while($res = $rs->fetch())
 {

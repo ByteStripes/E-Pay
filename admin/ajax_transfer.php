@@ -58,7 +58,7 @@ case 'transferList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_transfer WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_transfer WHERE{$sql} order by biz_no desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_transfer WHERE{$sql} order by biz_no desc LIMIT $limit OFFSET $offset", $params);
 	$list2 = [];
 	foreach($list as $row){
 		if($row['type'] == 'wxpay' && $row['status'] == 0 && !empty($row['ext'])){
@@ -165,8 +165,9 @@ case 'setTransferStatus':
 	$data = ['status'=>$status];
 	if(!empty($reason)) $data['result'] = $reason;
 	if($status == 1 && empty($order['paytime'])) $data['paytime'] = date('Y-m-d H:i:s');
-	if($DB->update('transfer', $data, ['biz_no' => $biz_no])){
-		if($status == 2 && ($order['status'] == 3 || $order['status'] == 0) && $order['uid'] > 0){
+	$prevStatus = intval($order['status']);
+	if($DB->update('transfer', $data, ['biz_no' => $biz_no]) !== false){
+		if($status == 2 && ($prevStatus === 3 || $prevStatus === 0) && $order['uid'] > 0){
 			changeUserMoney($order['uid'], $order['costmoney'], true, '代付退回', $biz_no);
 		}
 		exit('{"code":0,"msg":"succ"}');
@@ -182,12 +183,14 @@ case 'refundTransfer':
 	$biz_no=$_POST['biz_no'];
 	$order = $DB->find('transfer', '*', ['biz_no' => $biz_no]);
     if(!$order) exit('{"code":-1,"msg":"付款记录不存在！"}');
-	if($DB->exec("UPDATE pre_transfer SET status='2' WHERE biz_no=:biz_no", [':biz_no'=>$biz_no])){
+	if($order['status'] == 2) exit('{"code":-1,"msg":"该笔代付已退回，请勿重复操作！"}');
+	if($DB->exec("UPDATE pre_transfer SET status=2 WHERE biz_no=:biz_no AND status IN (0,3,4)", [':biz_no'=>$biz_no])){
 		if($order['uid'] > 0){
 			changeUserMoney($order['uid'], $order['costmoney'], true, '代付退回', $biz_no);
 		}
+		exit('{"code":0,"msg":"已成功将¥'.$order['costmoney'].'退给商户'.$order['uid'].'"}');
 	}
-	exit('{"code":0,"msg":"已成功将¥'.$order['costmoney'].'退给商户'.$order['uid'].'"}');
+	exit('{"code":-1,"msg":"当前状态不允许退回！"}');
 break;
 case 'transfer_proof':
 	$biz_no=trim($_POST['biz_no']);
@@ -221,7 +224,7 @@ break;
 case 'batch_submit':
 	$type = isset($_POST['type'])?$_POST['type']:'alipay';
 	$out_biz_no = date("YmdHis").random_int(11111,99999);
-	if(!isset($_POST['paypwd']) || $_POST['paypwd']!==$conf['admin_paypwd'])exit('{"code":-2,"msg":"支付密码错误"}');
+	if(!isset($_POST['paypwd']) || !verifyAdminPayPwd($_POST['paypwd']))exit('{"code":-2,"msg":"支付密码错误"}');
 	$payee_account = htmlspecialchars(trim($_POST['account']));
 	$payee_real_name = htmlspecialchars(trim($_POST['name']));
 	$money = trim($_POST['money']);

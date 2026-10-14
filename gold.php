@@ -21,7 +21,7 @@ if($out_trade_no){
 		$trade_no = $order['trade_no'];
 		$jump_url = $siteurl.'pay/return/'.$trade_no.'/';
 	}else{
-		$errmsg = '订单号不存在<br/>out_trade_no='.$out_trade_no;
+		$errmsg = '订单号不存在<br/>out_trade_no='.htmlspecialchars((string)$out_trade_no, ENT_QUOTES, 'UTF-8');
 	}
 }else{
 	$errmsg = '订单号不能为空';

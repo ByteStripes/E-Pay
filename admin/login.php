@@ -21,7 +21,7 @@ if(isset($_GET['act']) && $_GET['act']=='login'){
   if($verifycode==1 && (!$code || strtolower($code) != $_SESSION['vc_code'])){
     exit(json_encode(['code'=>-1,'msg'=>'验证码错误']));
   }
-  $errcount = $DB->getColumn("SELECT count(*) FROM `pre_log` WHERE `ip`=:ip AND `date`>DATE_SUB(NOW(),INTERVAL 1 DAY) AND `uid`=0 AND `type`='登录失败'", [':ip'=>$clientip]);
+  $errcount = $DB->getColumn("SELECT count(*) FROM pre_log WHERE ip=:ip AND date>(NOW() - INTERVAL '1 DAY') AND uid=0 AND type='登录失败'", [':ip'=>$clientip]);
   if($errcount >= $login_limit_count && file_exists($login_limit_file) && !$conf['totp_open']){
     exit(json_encode(['code'=>-1,'msg'=>'多次登录失败，暂时禁止登录。可删除@login.lock文件解除限制']));
   }
@@ -61,6 +61,8 @@ if(isset($_GET['act']) && $_GET['act']=='login'){
       if (file_exists($login_limit_file)) {
           unlink($login_limit_file);
       }
+      $_SESSION['admin_pwd_verified'] = ['user' => $username, 'time' => time()];
+      unset($_SESSION['vc_code']);
       exit(json_encode(['code'=>-1, 'msg'=>'需要验证动态口令', 'vcode' => 2]));
     }
     $DB->insert('log', ['uid'=>0, 'type'=>'登录后台', 'date'=>'NOW()', 'ip'=>$clientip]);
@@ -96,6 +98,17 @@ if(isset($_GET['act']) && $_GET['act']=='login'){
   }
 }elseif(isset($_GET['act']) && $_GET['act']=='totp'){
   if(!checkRefererHost())exit('{"code":403}');
+  // 安全加固：强制校验第一阶段账号密码已完成认证且未超时（5分钟内有效），防止直接调用 act=totp 绕过密码认证
+  if (empty($_SESSION['admin_pwd_verified']) || !is_array($_SESSION['admin_pwd_verified']) || $_SESSION['admin_pwd_verified']['user'] !== $conf['admin_user'] || (time() - intval($_SESSION['admin_pwd_verified']['time'])) > 300) {
+    unset($_SESSION['admin_pwd_verified']);
+    exit(json_encode(['code'=>-1,'msg'=>'请先验证管理员账号和密码']));
+  }
+  $totp_fail_key = 'totp_fail_'.md5($_SERVER['REMOTE_ADDR']);
+  $totp_fail_count = isset($_SESSION[$totp_fail_key]) ? intval($_SESSION[$totp_fail_key]) : 0;
+  $totp_fail_time = isset($_SESSION[$totp_fail_key.'_time']) ? intval($_SESSION[$totp_fail_key.'_time']) : 0;
+  if ($totp_fail_count >= 5 && (time() - $totp_fail_time) < 900) {
+    exit('{"code":-1,"msg":"动态口令错误次数过多，请15分钟后再试"}');
+  }
   $code = trim($_POST['code']);
   if (empty($code)) exit(json_encode(['code'=>-1,'msg'=>'请输入动态口令']));
   if ($conf['totp_open'] != 1 || empty($conf['totp_secret'])) {
@@ -104,11 +117,15 @@ if(isset($_GET['act']) && $_GET['act']=='login'){
   try {
     $totp = \lib\TOTP::create($conf['totp_secret']);
     if (!$totp->verify($code)) {
+      $_SESSION[$totp_fail_key] = $totp_fail_count + 1;
+      $_SESSION[$totp_fail_key.'_time'] = time();
+      $DB->insert('log', ['uid'=>0, 'type'=>'登录失败', 'date'=>'NOW()', 'ip'=>$clientip]);
       exit(json_encode(['code'=>-1,'msg'=>'动态口令错误']));
     }
   } catch (Exception $e) {
     exit(json_encode(['code'=>-1,'msg'=>$e->getMessage()]));
   }
+  unset($_SESSION['admin_pwd_verified'], $_SESSION[$totp_fail_key], $_SESSION[$totp_fail_key.'_time']);
   $DB->insert('log', ['uid'=>0, 'type'=>'登录后台', 'date'=>'NOW()', 'ip'=>$clientip]);
   // 安全修复(L3 会话固定)：TOTP 二次验证通过、最终登录成功后同样重新生成会话ID。
   if(session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);

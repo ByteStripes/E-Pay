@@ -609,7 +609,7 @@ class yinyingtong_plugin
 				$money = $data['amount'];
 				$bill_trade_no = $data['seq_no'];
 
-				$ext = unserialize($order['ext']);
+				$ext = unserialize($order['ext'], ['allowed_classes' => false]);
 				$ext['transcode'] = $data['transcode'];
 
 				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
@@ -667,7 +667,7 @@ class yinyingtong_plugin
 		require_once(PAY_ROOT.'inc/PayClient.php');
 		$client = new PayClient($channel['appid'], $channel['appkey']);
 
-		$ext = unserialize($order['ext']);
+		$ext = unserialize($order['ext'], ['allowed_classes' => false]);
 
 		$params = [
 			'scene' => $ext['transcode'] == 'T61' ? '0615' : '0606',

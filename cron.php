@@ -13,8 +13,8 @@ if (function_exists("ignore_user_abort"))
 
 @header('Content-Type: text/html; charset=UTF-8');
 
-// IP白名单与频率限制
-$cron_ip = real_ip(1);
+// IP白名单与频率限制（安全加固：使用 REMOTE_ADDR 防止伪造 X-Real-IP 绕过频控）
+$cron_ip = real_ip(2);
 $cron_allowed_ips = ['127.0.0.1', '::1'];
 if (!empty($conf['server_ip'])) {
 	$cron_allowed_ips[] = $conf['server_ip'];
@@ -30,11 +30,12 @@ if (!in_array($cron_ip, $cron_allowed_ips)) {
 }
 
 if(empty($conf['cronkey']))exit("请先设置好监控密钥");
-if($conf['cronkey']!=$_GET['key'])exit("监控密钥不正确");
+if(!isset($_GET['key']) || !hash_equals((string)$conf['cronkey'], (string)$_GET['key']))exit("监控密钥不正确");
 
 if($_GET['do']=='settle'){
 	$settle_time=getSetting('settle_time', true);
-	if(strtotime($settle_time)>=strtotime(date("Y-m-d").' 00:00:00'))exit('自动生成结算列表今日已完成');
+	if($settle_time && strtotime($settle_time)>=strtotime(date("Y-m-d").' 00:00:00'))exit('自动生成结算列表今日已完成');
+	saveSetting('settle_time', $date);
 	$rs=$DB->query("SELECT * from pre_user where money>=:settle_money and settle=1 and status=1 and account is not null and username is not null", [':settle_money'=>$conf['settle_money']]);
 	$i=0;
 	$allmoney=0;
@@ -71,13 +72,12 @@ if($_GET['do']=='settle'){
 		}else{
 			$realmoney=$row['money'];
 		}
+		if(!changeUserMoney($row['uid'], $row['money'], false, '自动结算')) continue;
 		$data = ['uid'=>$row['uid'], 'type'=>$row['settle_id'], 'account'=>$row['account'], 'username'=>$row['username'], 'money'=>$row['money'], 'realmoney'=>$realmoney, 'addtime'=>'NOW()', 'status'=>0];
 		if($DB->insert('settle', $data)){
-			changeUserMoney($row['uid'], $row['money'], false, '自动结算');
 			$allmoney+=$realmoney;
 		}
 	}
-	saveSetting('settle_time', $date);
 	exit('自动生成结算列表成功 allmony='.$allmoney.' num='.$i);
 }
 elseif($_GET['do']=='order'){
@@ -107,9 +107,9 @@ elseif($_GET['do']=='order'){
 
 	$CACHE->clean();
 	$DB->exec("delete from pre_order where status=0 and addtime<:thtime", [':thtime'=>$thtime]);
-	$DB->exec("delete from pre_regcode where `time`<:exptime", [':exptime'=>(string)(time()-3600*24)]);
+	$DB->exec("delete from pre_regcode where time<:exptime", [':exptime'=>intval(time()-3600*24)]);
 	$DB->exec("delete from pre_blacklist where endtime is not null and endtime<NOW()");
-	$DB->exec("delete from pay_wxkflog where addtime<:exptime", [':exptime'=>date("Y-m-d H:i:s", strtotime('-48 hours'))]);
+	$DB->exec("delete from pre_wxkflog where addtime<:exptime", [':exptime'=>date("Y-m-d H:i:s", strtotime('-48 hours'))]);
 
 	$day = date("Ymd", strtotime("-1 day"));
 
@@ -194,7 +194,7 @@ elseif($_GET['do']=='order'){
 		}
 	}
 
-	$expire_users = $DB->getAll("SELECT uid,gid,status,endtime FROM pre_user WHERE gid>0 AND endtime>0 AND endtime<NOW()");
+	$expire_users = $DB->getAll("SELECT uid,gid,status,endtime FROM pre_user WHERE gid>0 AND endtime IS NOT NULL AND endtime<NOW()");
 	foreach($expire_users as $row){
 		$group = $DB->getRow("SELECT * FROM pre_group WHERE gid=:gid", [':gid'=>$row['gid']]);
 		$gid = $group['orig'] > 0 ? $group['orig'] : 0;
@@ -208,7 +208,7 @@ elseif($_GET['do']=='order'){
 elseif($_GET['do']=='notify'){
 	$limit = 20; //每次重试的订单数量
 	for($i=0;$i<$limit;$i++){
-		$srow=$DB->getRow("SELECT * FROM pre_order WHERE (TO_DAYS(NOW()) - TO_DAYS(endtime) <= 1) AND notify>0 AND notifytime<NOW() LIMIT 1");
+		$srow=$DB->getRow("SELECT * FROM pre_order WHERE endtime >= (NOW() - INTERVAL '1 DAY') AND notify>0 AND notifytime<NOW() LIMIT 1");
 		if(!$srow)break;
 
 		//通知时间：1分钟，3分钟，20分钟，1小时，2小时
@@ -225,7 +225,7 @@ elseif($_GET['do']=='notify'){
 			$DB->exec("UPDATE pre_order SET notify=-1,notifytime=NULL WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
 			continue;
 		}
-		$DB->exec("UPDATE pre_order SET notify=:notify,notifytime=date_add(now(), interval {$interval}) WHERE trade_no=:trade_no", [':notify'=>$notify, ':trade_no'=>$srow['trade_no']]);
+		$DB->exec("UPDATE pre_order SET notify=:notify,notifytime=(NOW() + INTERVAL '{$interval}') WHERE trade_no=:trade_no", [':notify'=>$notify, ':trade_no'=>$srow['trade_no']]);
 
 		$url=creat_callback($srow);
 		if(do_notify($url['notify'])){
@@ -261,7 +261,7 @@ elseif($_GET['do']=='notify'){
 elseif($_GET['do']=='notify2'){
 	$limit = 20; //每次重试的订单数量
 	for($i=0;$i<$limit;$i++){
-		$srow=$DB->getRow("SELECT * FROM pre_order WHERE (TO_DAYS(NOW()) - TO_DAYS(endtime) <= 1) AND notify=-1 LIMIT 1");
+		$srow=$DB->getRow("SELECT * FROM pre_order WHERE endtime >= (NOW() - INTERVAL '1 DAY') AND notify=-1 LIMIT 1");
 		if(!$srow)break;
 
 		$url=creat_callback($srow);
@@ -337,7 +337,7 @@ elseif($_GET['do']=='complain'){
 elseif($_GET['do']=='complain_complete'){
 	$interval = 5 * 60; //延迟处理时间（秒）
 	$limit = 10; //每次处理的投诉数量
-	$complain = $DB->getAll("SELECT * FROM pre_complain WHERE status=1 AND paytype=2 AND edittime<DATE_SUB(NOW(), INTERVAL {$interval} SECOND) AND addtime>DATE_SUB(NOW(), INTERVAL 3 DAY) ORDER BY id ASC LIMIT {$limit}");
+	$complain = $DB->getAll("SELECT * FROM pre_complain WHERE status=1 AND paytype=2 AND edittime<(NOW() - INTERVAL '{$interval} SECOND') AND addtime>(NOW() - INTERVAL '3 DAY') ORDER BY id ASC LIMIT {$limit}");
 	foreach($complain as $row){
 		$channel = \lib\Channel::get($row['channel']);
 		if(!$channel)continue;
@@ -393,18 +393,19 @@ elseif($_GET['do']=='transfer'){
 			$realmoney=$row['money'];
 		}
 		$out_biz_no = date("YmdHis").random_int(11111,99999);
+		if(!changeUserMoney($row['uid'], $row['money'], false, '自动结算', $out_biz_no)) continue;
 		$channel = \lib\Channel::get($conf['transfer_alipay']);
 		$result = transfer_do('alipay', $channel, $out_biz_no, $row['account'], $row['username'], $realmoney);
 		if($result['code']==0){
 			$data = ['uid'=>$row['uid'], 'type'=>$row['settle_id'], 'account'=>$row['account'], 'username'=>$row['username'], 'money'=>$row['money'], 'realmoney'=>$realmoney, 'addtime'=>'NOW()', 'endtime'=>'NOW()', 'status'=>1, 'transfer_no'=>$out_biz_no, 'transfer_channel'=>$conf['transfer_alipay'], 'transfer_status'=>1, 'transfer_result'=>$result["orderid"], 'transfer_date'=>$result["paydate"]];
 			if($DB->insert('settle', $data)){
 				$success++;
-				changeUserMoney($row['uid'], $row['money'], false, '自动结算');
 				echo '商户'.$row['uid'].'成功结算'.$realmoney.'元，交易号：'.$result["orderid"].'<br/>';
 			}else{
 				echo '商户'.$row['uid'].'成功结算'.$realmoney.'元，但记录插入失败<br/>';
 			}
 		}else{
+			changeUserMoney($row['uid'], $row['money'], true, '结算失败退回', $out_biz_no);else{
 			echo '商户'.$row['uid'].'结算'.$realmoney.'元失败：'.$result['msg'].'<br/>';
 			if(!in_array($result['errcode'], $payee_err_code)){
 				$DB->exec("UPDATE pre_channel SET status=0 WHERE id=:id", [':id'=>$channel['id']]);

@@ -1,11 +1,11 @@
 <?php
-//程序安装文件
+//程序安装文件 (PostgreSQL安全加固版)
 error_reporting(0);
 date_default_timezone_set("PRC");
-$databaseFile = '../config.php';//数据库配额文件
+$databaseFile = '../config.php';//数据库配置文件
 
 @header('Content-Type: text/html; charset=UTF-8');
-$step=isset($_GET['step'])?$_GET['step']:1;
+$step=isset($_GET['step'])?intval($_GET['step']):1;
 if(file_exists('install.lock')){
     exit('你已经成功安装，如需重新安装，请手动删除install目录下install.lock文件！');
 }
@@ -13,16 +13,16 @@ if(file_exists('install.lock')){
 function clearpack() {
 	$array=glob('../epay_release*');
 	foreach($array as $dir){
-		unlink($dir);
+		@unlink($dir);
 	}
 	$array=glob('../epay_update*');
 	foreach($array as $dir){
-		unlink($dir);
+		@unlink($dir);
 	}
 }
 
 function random($length, $numeric = 0) {
-	$seed = base_convert(md5(microtime().$_SERVER['DOCUMENT_ROOT']), 16, $numeric ? 10 : 35);
+	$seed = base_convert(md5(random_bytes(16)), 16, $numeric ? 10 : 35);
 	$seed = $numeric ? (str_replace('0', '', $seed).'012340567890') : ($seed.'zZ'.strtoupper($seed));
 	$hash = '';
 	$max = strlen($seed) - 1;
@@ -33,20 +33,26 @@ function random($length, $numeric = 0) {
 }
 
 if($step==3){
-    if($_GET['jump']==1){
+    if(isset($_GET['jump']) && $_GET['jump']==1){
         include '../config.php';
-        if(!$dbconfig['user']||!$dbconfig['pwd']||!$dbconfig['dbname']) {
+        if(empty($dbconfig['user']) || empty($dbconfig['pwd']) || empty($dbconfig['dbname'])) {
             $errorMsg='请先填写好数据库并保存后再安装！';
         }
     }else{
-        $host=isset($_POST['host'])?$_POST['host']:null;
-        $port=isset($_POST['port'])?$_POST['port']:null;
-        $user=isset($_POST['user'])?$_POST['user']:null;
+        $host=isset($_POST['host'])?trim($_POST['host']):null;
+        $port=isset($_POST['port'])?intval($_POST['port']):5432;
+        $user=isset($_POST['user'])?trim($_POST['user']):null;
         $pwd=isset($_POST['pwd'])?$_POST['pwd']:null;
-        $database=isset($_POST['database'])?$_POST['database']:null;
-        $dbqz=isset($_POST['dbqz'])?$_POST['dbqz']:null;
-        if(empty($host) || empty($port) || empty($user) || empty($pwd) || empty($database) || empty($dbqz)){
+        $database=isset($_POST['database'])?trim($_POST['database']):null;
+        $dbqz=isset($_POST['dbqz'])?trim($_POST['dbqz']):'pay';
+        if(empty($host) || $port<=0 || $port>65535 || empty($user) || empty($pwd) || empty($database) || empty($dbqz)){
             $errorMsg='请填写完整所有数据库信息！';
+        }elseif(!preg_match('/^[a-zA-Z0-9_]+$/', $dbqz)){
+            $errorMsg='数据表前缀仅允许字母、数字和下划线！';
+        }elseif(!preg_match('/^[a-zA-Z0-9_.\-]+$/', $host)){
+            $errorMsg='数据库地址格式不正确！';
+        }elseif(!preg_match('/^[a-zA-Z0-9_\-]+$/', $database)){
+            $errorMsg='数据库名称格式不正确！';
         }
         $dbconfig=array(
             'host' => $host,
@@ -56,65 +62,55 @@ if($step==3){
             'dbname' => $database,
             'dbqz' => $dbqz
         );
-        $config="<?php
-    /*数据库配置*/
-    \$dbconfig=array(
-        'host' => '{$host}', //数据库服务器
-        'port' => {$port}, //数据库端口
-        'user' => '{$user}', //数据库用户名
-        'pwd' => '{$pwd}', //数据库密码
-        'dbname' => '{$database}', //数据库名
-        'dbqz' => '{$dbqz}' //数据表前缀
-    );
-    ";
+        // 安全加固：使用 var_export 序列化配置，彻底杜绝单引号逃逸导致的 config.php 代码注入 (RCE)
+        $config = "<?php\n/*PostgreSQL数据库配置*/\n\$dbconfig = " . var_export($dbconfig, true) . ";\n";
     }
     if(empty($errorMsg)){
         try{
-            $DB=new PDO("mysql:host=".$dbconfig['host'].";dbname=".$dbconfig['dbname'].";port=".$dbconfig['port'],$dbconfig['user'],$dbconfig['pwd']);
+            $dsn = "pgsql:host=".$dbconfig['host'].";port=".intval($dbconfig['port']).";dbname=".$dbconfig['dbname'];
+            $DB = new PDO($dsn, $dbconfig['user'], $dbconfig['pwd']);
         }catch(Exception $e){
-            if($e->getCode() == 2002){
-                $errorMsg='连接数据库失败：数据库地址填写错误！';
-            }elseif($e->getCode() == 1045){
-                $errorMsg='连接数据库失败：数据库用户名或密码填写错误！';
-            }elseif($e->getCode() == 1049){
-                $errorMsg='连接数据库失败：数据库名不存在！';
-            }else{
-                $errorMsg='连接数据库失败：'.$e->getMessage();
-            }
+            $errorMsg='连接PostgreSQL数据库失败：'.htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
         }
         if(empty($errorMsg)){
             $DB->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
-            $DB->exec("set sql_mode = ''");
-            $DB->exec("set names utf8");
-            $mysqlversion = $DB->query("select version()")->fetchColumn();
-            if(version_compare($mysqlversion, '5.5.3', '<')){
-                $errorMsg='MySQL数据库版本太低，需要MySQL 5.6或以上版本！';
+            $DB->exec("SET NAMES 'UTF8'");
+            $DB->exec("SET TIME ZONE '+8'");
+            $pgversion = $DB->query("SHOW server_version")->fetchColumn();
+            if($pgversion && version_compare($pgversion, '10.0', '<')){
+                $errorMsg='PostgreSQL数据库版本太低，需要PostgreSQL 10或以上版本！';
             }
-            if(!$_GET['jump'] && !file_put_contents($databaseFile, $config)){
+            if(empty($_GET['jump']) && !file_put_contents($databaseFile, $config)){
                 $errorMsg='保存失败，请确保网站根目录有写入权限';
             }
         }
     }
 }elseif($step==4){
     include '../config.php';
-    if(!$dbconfig['user']||!$dbconfig['pwd']||!$dbconfig['dbname']) {
+    if(empty($dbconfig['user']) || empty($dbconfig['pwd']) || empty($dbconfig['dbname'])) {
         $errorMsg='请先填写好数据库并保存后再安装！';
+    }elseif(!preg_match('/^[a-zA-Z0-9_]+$/', $dbconfig['dbqz'])){
+        $errorMsg='数据表前缀非法！';
     }else{
         try{
-            $DB=new PDO("mysql:host=".$dbconfig['host'].";dbname=".$dbconfig['dbname'].";port=".$dbconfig['port'],$dbconfig['user'],$dbconfig['pwd']);
+            $dsn = "pgsql:host=".$dbconfig['host'].";port=".intval($dbconfig['port']).";dbname=".$dbconfig['dbname'];
+            $DB = new PDO($dsn, $dbconfig['user'], $dbconfig['pwd']);
         }catch(Exception $e){
-            $errorMsg='连接数据库失败：'.$e->getMessage();
+            $errorMsg='连接PostgreSQL数据库失败：'.htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
         }
-        if(empty($errorMsg) && !$_GET['jump']){
+        if(empty($errorMsg) && empty($_GET['jump'])){
             $dbqz = $dbconfig['dbqz'];
             $DB->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
-            $DB->exec("set sql_mode = ''");
-            $DB->exec("set names utf8");
+            $DB->exec("SET NAMES 'UTF8'");
+            $DB->exec("SET TIME ZONE '+8'");
             $sqls=file_get_contents('install.sql');
             $sqls=explode(';', $sqls);
-            $sqls[]="INSERT INTO `".$dbqz."_config` VALUES ('syskey', '".random(32)."')";
-            $sqls[]="INSERT INTO `".$dbqz."_config` VALUES ('build', '".date("Y-m-d")."')";
-            $sqls[]="INSERT INTO `".$dbqz."_config` VALUES ('cronkey', '".random_int(111111,999999)."')";
+            $adminDefaultHash = password_hash('123456', PASSWORD_DEFAULT);
+            $sqls[]="UPDATE ".$dbqz."_config SET v='".addslashes($adminDefaultHash)."' WHERE k='admin_pwd'";
+            $sqls[]="UPDATE ".$dbqz."_config SET v='".addslashes($adminDefaultHash)."' WHERE k='admin_paypwd'";
+            $sqls[]="INSERT INTO ".$dbqz."_config (k, v) VALUES ('syskey', '".random(32)."') ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v";
+            $sqls[]="INSERT INTO ".$dbqz."_config (k, v) VALUES ('build', '".date("Y-m-d")."') ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v";
+            $sqls[]="INSERT INTO ".$dbqz."_config (k, v) VALUES ('cronkey', '".bin2hex(random_bytes(16))."') ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v";
             $success=0;$error=0;$errorMsg=null;
             foreach ($sqls as $value) {
                 $value=trim($value);
@@ -123,7 +119,7 @@ if($step==3){
                 if($DB->exec($value)===false){
                     $error++;
                     $dberror=$DB->errorInfo();
-                    $errorMsg.=$dberror[2]."<br>";
+                    $errorMsg.=htmlspecialchars($dberror[2], ENT_QUOTES, 'UTF-8')."<br>";
                 }else{
                     $success++;
                 }
@@ -145,19 +141,19 @@ if($step==3){
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport">
     <meta content="yes" name="apple-mobile-web-app-capable">
     <meta content="black" name="apple-mobile-web-app-status-bar-style">
-    <title>彩虹易支付 - 安装程序</title>
+    <title>彩虹易支付 (PostgreSQL版) - 安装程序</title>
     <link href="//lib.baomitu.com/twitter-bootstrap/3.4.1/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
 <div class="container"><br>
     <div class="row">
         <div class="col-xs-12 col-sm-10 col-md-8 center-block" style="float: none;">
-            <pre><h4>彩虹易支付 - 安装程序</h4></pre>
+            <pre><h4>彩虹易支付 (PostgreSQL版) - 安装程序</h4></pre>
             <div class="panel panel-warning">
                 <?php
                 if($step==2){
                 ?>
-                <div class="panel-heading text-center">MYSQL数据库信息配置</div>
+                <div class="panel-heading text-center">PostgreSQL数据库信息配置</div>
                 <div class="panel-body">
                     <div class="list-group text-success">
                         <form class="form-horizontal" action="?step=3" method="post">
@@ -170,7 +166,7 @@ if($step==3){
                             <div class="form-group">
                                 <label class="col-sm-2 control-label">数据库端口</label>
                                 <div class="col-sm-10">
-                                    <input type="text" name="port" class="form-control" value="3306" required>
+                                    <input type="text" name="port" class="form-control" value="5432" required>
                                 </div>
                             </div>
                             <div class="form-group">
@@ -182,7 +178,7 @@ if($step==3){
                             <div class="form-group">
                                 <label class="col-sm-2 control-label">数据库密码</label>
                                 <div class="col-sm-10">
-                                    <input type="text" name="pwd" class="form-control" required>
+                                    <input type="password" name="pwd" class="form-control" required>
                                 </div>
                             </div>
 							<div class="form-group">
@@ -218,7 +214,7 @@ if(!empty($errorMsg)){
     echo '<div class="alert alert-danger text-center" role="alert">'.$errorMsg.'</div><div class="list-group-item"><a href="javascript:history.back(-1)" class="btn btn-block btn-info"><< 返回上一页</a></div>';
 }else{
     echo '<div class="alert alert-success text-center" role="alert">数据库配置文件保存成功！</div>';
-    if($DB->query("select * from ".$dbconfig['dbqz']."_config")){
+    if($DB->query("SELECT * FROM ".$dbconfig['dbqz']."_config LIMIT 1")){
 ?>
                 <div class="list-group-item list-group-item-info text-center">系统检测到你已安装过彩虹易支付</div>
 				<div class="list-group-item">
@@ -248,8 +244,8 @@ if(!empty($errorMsg)){
                     <?php if($success>0){?><div class="alert alert-success" role="alert">成功执行SQL语句<?php echo $success;?>条，失败<?php echo $error;?>条！</div><?php }?>
                     <ul class="list-group">
                         <li class="list-group-item">1、系统已成功安装完毕！</li>
-                        <li class="list-group-item">2、后台地址：<a href="/admin/" target="_blank">/admin/</a> 密码:123456</li>
-                        <li class="list-group-item">3、请及时修改后台管理员密码！</li>
+                        <li class="list-group-item">2、后台地址：<a href="/admin/" target="_blank">/admin/</a> 初始密码:123456</li>
+                        <li class="list-group-item">3、请及时修改后台管理员密码和支付密码！</li>
                         <?php if(!$lock_status){?><li class="list-group-item">4、<font color="#FF0033">你的空间不支持本地文件读写，请自行在 /install/ 目录建立 install.lock 文件！</font></li><?php }?>
                         <li class="list-group-item"><a href="/" class="btn btn-block btn-default">进入网站首页</a></li>
                     </ul>
@@ -265,13 +261,13 @@ if(!empty($errorMsg)){
                         $check[2]='<span class="pull-right label label-danger">不支持</span>';
                         $install=false;
                     }
-                    if(class_exists("PDO")){
+                    if(class_exists("PDO") && extension_loaded("pdo_pgsql")){
                         $check[0]='<span class="pull-right label label-success">支持</span>';
                     }else{
                         $check[0]='<span class="pull-right label label-danger">不支持</span>';
                         $install=false;
                     }
-                    if(is_writable($databaseFile)) {
+                    if(is_writable($databaseFile) || is_writable(dirname($databaseFile))) {
                         $check[1]='<span class="pull-right label label-success">支持</span>';
                     }else{
                         $check[1]='<span class="pull-right label label-danger">不支持</span>';
@@ -286,7 +282,7 @@ if(!empty($errorMsg)){
                     ?>
                     <ul class="list-group">
                         <li class="list-group-item">PHP版本>=7.4 <?php echo $check[3];?></li>
-                        <li class="list-group-item">PDO_MYSQL组件 <?php echo $check[0];?></li>
+                        <li class="list-group-item">PDO_PGSQL组件 <?php echo $check[0];?></li>
                         <li class="list-group-item">CURL组件 <?php echo $check[2];?></li>
                         <li class="list-group-item">主目录写入权限 <?php echo $check[1];?></li>
                         <li class="list-group-item">成功安装后安装文件就会锁定，如需重新安装，请手动删除install目录下install.lock配置文件！</li>

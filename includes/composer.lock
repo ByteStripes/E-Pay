@@ -228,7 +228,7 @@
         },
         {
             "name": "lpilp/guomi",
-            "version": "v1.0.9",
+            "version": "v2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/lpilp/phpsm2sm3sm4.git",
@@ -241,8 +241,8 @@
                 "shasum": ""
             },
             "require": {
-                "mdanter/ecc": "^1.0",
-                "php": ">=7.2"
+                "php": ">=7.2",
+                "paragonie/ecc": "^2.0.4"
             },
             "type": "library",
             "autoload": {
@@ -271,8 +271,8 @@
             "time": "2024-02-04T08:43:06+00:00"
         },
         {
-            "name": "mdanter/ecc",
-            "version": "v1.0.0",
+            "name": "paragonie/ecc",
+            "version": "v2.0.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpecc/phpecc.git",
@@ -322,7 +322,7 @@
                     "role": "Maintainer"
                 }
             ],
-            "description": "PHP Elliptic Curve Cryptography library",
+            "description": "PHP Elliptic Curve Cryptography library (Hardened constant-time fork of mdanter/ecc)",
             "homepage": "https://github.com/phpecc/phpecc",
             "keywords": [
                 "Diffie",
@@ -344,7 +344,6 @@
                 "issues": "https://github.com/phpecc/phpecc/issues",
                 "source": "https://github.com/phpecc/phpecc/tree/v1.0.0"
             },
-            "abandoned": "paragonie/ecc",
             "time": "2021-01-16T19:42:14+00:00"
         }
     ],

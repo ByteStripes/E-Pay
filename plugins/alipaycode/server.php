@@ -10,17 +10,19 @@ $channelid = isset($argv[1]) ? intval($argv[1]) : exit('支付通道ID不能为�
 $channel = \lib\Channel::get($channelid);
 if(!$channel || $channel['plugin'] != 'alipaycode') exit('支付通道不存在');
 $sql = "";
+$sql_params = [':cid' => intval($channel['id'])];
 if(substr($channel['apptoken'], 0, 1) == '['){
     $channel = \lib\Channel::getSub($channelid);
     if(!$channel || $channel['plugin'] != 'alipaycode') exit('子通道不存在');
-    $sql = " AND subchannel='{$channel['subid']}'";
+    $sql = " AND subchannel=:scid";
+    $sql_params[':scid'] = intval($channel['subid']);
 }
 $alipay_config = require(PLUGIN_ROOT.$channel['plugin'].'/inc/config.php');
 $aop = new \Alipay\AlipayBillService($alipay_config);
 
 while(true){
     $now = time();
-    $list = $DB->getAll("SELECT trade_no,realmoney FROM pre_order WHERE channel='{$channel['id']}'{$sql} AND status=0 AND addtime>=DATE_SUB(NOW(), INTERVAL 8 MINUTE)");
+    $list = $DB->getAll("SELECT trade_no,realmoney FROM pre_order WHERE channel=:cid{$sql} AND status=0 AND addtime>=(NOW() - INTERVAL '8 MINUTE')", $sql_params);
     if(empty($list)){
         echo '暂无未支付订单...'.PHP_EOL;
         goto WAIT;

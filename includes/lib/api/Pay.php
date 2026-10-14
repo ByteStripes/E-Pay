@@ -58,6 +58,7 @@ class Pay
         if(!preg_match('/^[a-zA-Z0-9.\_\-|]+$/',$out_trade_no))sysmsg('订单号(out_trade_no)格式不正确');
         if($money<=0 || !is_numeric($money) || !preg_match('/^[0-9.]+$/', $money))sysmsg('金额不合法');
         if(!is_url($notify_url))sysmsg('通知地址(notify_url)格式不正确');
+        if(!is_url($return_url))sysmsg('回调地址(return_url)格式不正确');
         if(!empty($cert_no) && !is_idcard($cert_no)) sysmsg('身份证号码格式不正确');
         if(!empty($min_age) && (!is_numeric($min_age) || $min_age < 0)) sysmsg('最低年龄格式不正确');
         $cert_info = null;
@@ -128,7 +129,9 @@ class Pay
 
         if(checkPayVerifyOpen($pid)){
             $defend_key = getDefendKey($pid, $out_trade_no);
-            if(empty($defend_result) || $defend_key!==substr($defend_result,10,32)){
+            $defend_time = !empty($defend_result) ? intval(substr((string)$defend_result, 0, 10)) : 0;
+            $defend_sig = !empty($defend_result) ? substr((string)$defend_result, 10, 32) : '';
+            if(empty($defend_result) || abs(time() - $defend_time) > 300 || !hash_equals($defend_key, (string)$defend_sig)){
                 if($conf['pay_verify_type'] == 3) sysmsg('当前商户已超出订单并发量限制，请稍后再试');
                 showPayVerifyPage($defend_key, $queryArr);
             }

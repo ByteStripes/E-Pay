@@ -27,9 +27,8 @@ class RtSm2
     // 是否固定签名不随机，好处是同一段参数的签名固定，增大别人的猜测的难度,
     // 同样的key + document每次签名是一样的，如果为false则每次不一样
     protected $useDerandomizedSignatures = true;
-    // 是否固定加密不随机，算法中的是否每次都用不同的中间椭圆，如果固定的话，
-    // 同样的文本加密后的数据是一样的，但速度会更快一些，随机的话，每次加密出来的数据不一样
-    protected $useDerandomizedEncrypt = true;
+    // 安全加固：默认禁用固定中间椭圆加密，防止静态私钥(foreignKey)导致密文可被离线推导
+    protected $useDerandomizedEncrypt = false;
     // 输入输出的签名方式 16进制的还是base64
     protected $formatSign = 'hex';
     // 可扩展自定义多种返回签名方式
@@ -46,7 +45,7 @@ class RtSm2
      * @param string $formatSign 
      * @param boolean $randFixed 是否使用中间椭圆，使用中间椭圆的话，速度会快一些，但同样的数据的签名或加密的值就固定了
      */
-    function __construct($formatSign = 'hex', $randFixed = true)
+    function __construct($formatSign = 'hex', $randFixed = false)
     {
         $this->adapter = RtEccFactory::getAdapter();
         $this->generator = RtEccFactory::getSmCurves()->generatorSm2();

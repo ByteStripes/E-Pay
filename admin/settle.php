@@ -23,7 +23,7 @@ $pages=ceil($numrows/$pagesize);
 $page=isset($_GET['page'])?intval($_GET['page']):1;
 $offset=$pagesize*($page - 1);
 
-$rs=$DB->query("SELECT * FROM pre_batch order by time desc limit $offset,$pagesize", null);
+$rs=$DB->query("SELECT * FROM pre_batch order by time desc LIMIT $pagesize OFFSET $offset", null);
 while($res = $rs->fetch())
 {
 echo '<tr><td><b>'.$res['batch'].'</b></td><td>'.$res['allmoney'].'</td><td>'.$res['count'].'</td><td>'.$res['time'].'</td><td><a href="./slist.php?batch='.$res['batch'].'" class="btn btn-xs btn-info">结算列表</a>&nbsp;<a href="javascript:download_csv(\''.$res['batch'].'\')" class="btn btn-xs btn-warning">导出表格</a>&nbsp;<a href="javascript:transfer(\''.$res['batch'].'\')" class="btn btn-xs btn-success">批量转账</a>&nbsp;<a href="javascript:completeBatch(\''.$res['batch'].'\')" class="btn btn-xs btn-primary">改为完成</a></td></tr>';

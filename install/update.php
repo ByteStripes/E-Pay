@@ -14,18 +14,20 @@ require '../config.php';
 @header('Content-Type: text/html; charset=UTF-8');
 
 try{
-	$db=new PDO("mysql:host=".$dbconfig['host'].";dbname=".$dbconfig['dbname'].";port=".$dbconfig['port'],$dbconfig['user'],$dbconfig['pwd']);
+	$dsn = "pgsql:host=".$dbconfig['host'].";port=".intval($dbconfig['port']).";dbname=".$dbconfig['dbname'];
+	$db = new PDO($dsn, $dbconfig['user'], $dbconfig['pwd']);
 }catch(Exception $e){
-	exit('链接数据库失败:'.$e->getMessage());
+	exit('连接PostgreSQL数据库失败:'.htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
 }
 date_default_timezone_set("PRC");
 $date = date("Y-m-d");
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
-$db->exec("set sql_mode = ''");
-$db->exec("set names utf8");
+$db->exec("SET NAMES 'UTF8'");
+$db->exec("SET TIME ZONE '+8'");
 
+$dbqz = preg_match('/^[a-zA-Z0-9_]+$/', $dbconfig['dbqz']) ? $dbconfig['dbqz'] : 'pay';
 $version = 0;
-if($rs = $db->query("SELECT v FROM pay_config WHERE k='version'")){
+if($rs = $db->query("SELECT v FROM {$dbqz}_config WHERE k='version'")){
 	$version = $rs->fetchColumn();
 }
 
@@ -35,31 +37,28 @@ if($version==DB_VERSION){
 	$sqls = file_get_contents('update2.sql');
 	$sqls .= file_get_contents('update3.sql');
 	$sqls=explode(';', $sqls);
-	$sqls[]="UPDATE `pre_config` SET `v` = '".DB_VERSION."' where `k` = 'version'";
+	$sqls[]="UPDATE pre_config SET v = '".DB_VERSION."' WHERE k = 'version'";
 }elseif($version<DB_VERSION){
 	$sqls = file_get_contents('update3.sql');
 	$sqls=explode(';', $sqls);
-	$sqls[]="UPDATE `pre_config` SET `v` = '".DB_VERSION."' where `k` = 'version'";
+	$sqls[]="UPDATE pre_config SET v = '".DB_VERSION."' WHERE k = 'version'";
 }else{
 	exit('数据库不兼容，请重新安装！');
 }
-$sqls[]="UPDATE `pre_cache` SET `v` = '' where `k` = 'config'";
+$sqls[]="UPDATE pre_cache SET v = '' WHERE k = 'config'";
 $success=0;$error=0;$errorMsg=null;
 foreach ($sqls as $value) {
 	$value=trim($value);
 	if(empty($value))continue;
-	$value = str_replace('pre_',$dbconfig['dbqz'].'_',$value);
+	$value = str_replace('pre_',$dbqz.'_',$value);
 	if($db->exec($value)===false){
 		$error++;
 		$dberror=$db->errorInfo();
-		$errorMsg.=$dberror[2]."<br>";
+		$errorMsg.=htmlspecialchars($dberror[2], ENT_QUOTES, 'UTF-8')."<br>";
 	}else{
 		$success++;
 	}
 }
 echo '成功执行SQL语句'.$success.'条！<br/>';
-if($errorMsg){
-//echo '<div class="alert alert-danger text-center" role="alert">'.$errorMsg.'</div>';
-}
 echo '<hr/><a href="/">点此返回首页</a>';
 ?>

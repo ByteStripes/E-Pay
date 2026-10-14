@@ -48,7 +48,7 @@ class RiskCheck
 				$subchannels = $DB->getAll("SELECT * FROM pre_subchannel WHERE channel=:cid AND status=1 ORDER BY id ASC", [':cid'=>$channelid]);
 				foreach($subchannels as $subchannel){
 					$subchannelid = $subchannel['id'];
-					$orders=$DB->getAll("SELECT trade_no,status FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) AND channel=:cid AND subchannel=:scid order by trade_no desc limit ".intval($failcount), [':sec'=>$second, ':cid'=>$channelid, ':scid'=>$subchannelid]);
+					$orders=$DB->getAll("SELECT trade_no,status FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) AND channel=:cid AND subchannel=:scid order by trade_no desc limit ".intval($failcount), [':sec'=>$second, ':cid'=>$channelid, ':scid'=>$subchannelid]);
 					if(count($orders)<$failcount)continue;
 					$succount = 0;
 					foreach($orders as $order){
@@ -70,7 +70,7 @@ class RiskCheck
 					}
 				}
 			}else{
-				$orders=$DB->getAll("SELECT trade_no,status FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) AND channel=:cid order by trade_no desc limit ".intval($failcount), [':sec'=>$second, ':cid'=>$channelid]);
+				$orders=$DB->getAll("SELECT trade_no,status FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) AND channel=:cid order by trade_no desc limit ".intval($failcount), [':sec'=>$second, ':cid'=>$channelid]);
 				if(count($orders)<$failcount)continue;
 				$succount = 0;
 				foreach($orders as $order){
@@ -106,9 +106,9 @@ class RiskCheck
             return;
         }
 		//统计指定时间内每个商户的总订单数量
-		$user_all_stats_rows=$DB->getAll("SELECT uid,count(*) ordernum FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) GROUP BY uid", [':sec'=>$second]);
+		$user_all_stats_rows=$DB->getAll("SELECT uid,count(*) ordernum FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) GROUP BY uid", [':sec'=>$second]);
 		//统计指定时间内每个商户的成功订单数量
-		$user_suc_stats_rows=$DB->getAll("SELECT uid,count(*) ordernum FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) and status>0 GROUP BY uid", [':sec'=>$second]);
+		$user_suc_stats_rows=$DB->getAll("SELECT uid,count(*) ordernum FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) and status>0 GROUP BY uid", [':sec'=>$second]);
 		$user_suc_stats = [];
 		foreach($user_suc_stats_rows as $row){
 			if(!$row['uid']) continue;
@@ -141,7 +141,7 @@ class RiskCheck
         if($complain_rate <= 0){
             return;
         }
-		$complain_stats_rows = $DB->getAll("SELECT uid,count(*) num FROM pre_complain WHERE addtime>=DATE_SUB(NOW(), INTERVAL 7 DAY) AND uid<>0 GROUP BY uid");
+		$complain_stats_rows = $DB->getAll("SELECT uid,count(*) num FROM pre_complain WHERE addtime>=(NOW() - INTERVAL '7 DAY') AND uid<>0 GROUP BY uid");
 		if(!empty($complain_stats_rows)){
 			$complain_stats = [];
 			foreach($complain_stats_rows as $row){
@@ -152,7 +152,7 @@ class RiskCheck
 				$uids[] = $row['uid'];
 			}
 			$uidPlaceholders = implode(',', array_fill(0, count($uids), '?'));
-			$user_order_stats_rows=$DB->getAll("SELECT uid,count(*) ordernum FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL 7 DAY) and status>0 and uid in ($uidPlaceholders) GROUP BY uid", array_map('intval', $uids));
+			$user_order_stats_rows=$DB->getAll("SELECT uid,count(*) ordernum FROM pre_order WHERE addtime>=(NOW() - INTERVAL '7 DAY') and status>0 and uid in ($uidPlaceholders) GROUP BY uid", array_map('intval', $uids));
 			foreach($user_order_stats_rows as $row){
 				if(!isset($complain_stats[$row['uid']])) continue;
 				$total_num = intval($row['ordernum']);
@@ -185,9 +185,9 @@ class RiskCheck
             return;
         }
 		//统计指定时间内每个IP的总订单数量
-		$ip_all_stats_rows=$DB->getAll("SELECT ip,count(*) ordernum FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) GROUP BY ip", [':sec'=>$second]);
+		$ip_all_stats_rows=$DB->getAll("SELECT ip,count(*) ordernum FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) GROUP BY ip", [':sec'=>$second]);
 		//统计指定时间内每个IP的成功订单数量
-		$ip_suc_stats_rows=$DB->getAll("SELECT ip,count(*) ordernum FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) and status>0 GROUP BY ip", [':sec'=>$second]);
+		$ip_suc_stats_rows=$DB->getAll("SELECT ip,count(*) ordernum FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) and status>0 GROUP BY ip", [':sec'=>$second]);
 		$ip_suc_stats = [];
 		foreach($ip_suc_stats_rows as $row){
 			if(!$row['ip']) continue;
@@ -220,7 +220,7 @@ class RiskCheck
             return;
         }
 		//统计指定时间内每个支付账号的成功订单数量
-		$buyer_stats_rows=$DB->getAll("SELECT buyer,count(*) ordernum FROM pre_order WHERE addtime>=DATE_SUB(NOW(), INTERVAL :sec SECOND) and status>0 GROUP BY buyer", [':sec'=>$second]);
+		$buyer_stats_rows=$DB->getAll("SELECT buyer,count(*) ordernum FROM pre_order WHERE addtime>=(NOW() - (:sec || ' SECOND')::interval) and status>0 GROUP BY buyer", [':sec'=>$second]);
 		foreach($buyer_stats_rows as $row){
 			if(!$row['buyer']) continue;
 			if($row['ordernum'] < $count) continue;

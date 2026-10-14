@@ -7,38 +7,8 @@ use Mdanter\Ecc\Exception\PointException;
 use Mdanter\Ecc\Exception\PointNotOnCurveException;
 use Mdanter\Ecc\Math\GmpMathInterface;
 use Mdanter\Ecc\Math\ModularArithmetic;
+use Mdanter\Ecc\Util\BinaryString;
 
-/**
- * *********************************************************************
- * Copyright (C) 2012 Matyas Danter
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
- * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
- * OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- * ***********************************************************************
- */
-
-/**
- * This class is where the elliptic curve arithmetic takes place.
- * The important methods are:
- * - add: adds two points according to ec arithmetic
- * - double: doubles a point on the ec field mod p
- * - mul: uses double and add to achieve multiplication The rest of the methods are there for supporting the ones above.
- */
 class Point implements PointInterface
 {
     /**
@@ -76,21 +46,14 @@ class Point implements PointInterface
      */
     private $infinity = false;
 
-    /**
-     * Initialize a new instance
-     *
-     * @param GmpMathInterface     $adapter
-     * @param CurveFpInterface     $curve
-     * @param \GMP                 $x
-     * @param \GMP                 $y
-     * @param \GMP                 $order
-     * @param bool                 $infinity
-     *
-     * @throws \RuntimeException    when either the curve does not contain the given coordinates or
-     *                                      when order is not null and P(x, y) * order is not equal to infinity.
-     */
-    public function __construct(GmpMathInterface $adapter, CurveFpInterface $curve, \GMP $x, \GMP $y, \GMP $order = null, bool $infinity = false)
-    {
+    public function __construct(
+        GmpMathInterface $adapter,
+        CurveFpInterface $curve,
+        \GMP $x,
+        \GMP $y,
+        \GMP $order = null,
+        bool $infinity = false
+    ) {
         $this->adapter    = $adapter;
         $this->modAdapter = $curve->getModAdapter();
         $this->curve      = $curve;
@@ -110,63 +73,38 @@ class Point implements PointInterface
         }
     }
 
-    /**
-     * @return GmpMathInterface
-     */
     public function getAdapter(): GmpMathInterface
     {
         return $this->adapter;
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::isInfinity()
-     */
     public function isInfinity(): bool
     {
         return (bool) $this->infinity;
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::getCurve()
-     */
     public function getCurve(): CurveFpInterface
     {
         return $this->curve;
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::getOrder()
-     */
     public function getOrder(): \GMP
     {
         return $this->order;
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::getX()
-     */
     public function getX(): \GMP
     {
         return $this->x;
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::getY()
-     */
     public function getY(): \GMP
     {
         return $this->y;
     }
 
     /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::add()
-     * @return self
+     * Constant-time hardened Point::add (CVE-2024-33851 / GHSA-3494-cfwf-56hw & GHSA-346h-749j-r28w)
      */
     public function add(PointInterface $addend): PointInterface
     {
@@ -184,19 +122,33 @@ class Point implements PointInterface
 
         $math = $this->adapter;
         $modMath = $this->modAdapter;
+        $prime = $this->curve->getPrime();
+        $byteLen = (int) ceil($this->curve->getSize() / 8);
 
-        if ($math->equals($addend->getX(), $this->x)) {
-            if ($math->equals($addend->getY(), $this->y)) {
+        $x1Bin = str_pad($math->toString($this->x), $byteLen, "\x00", STR_PAD_LEFT);
+        $x2Bin = str_pad($math->toString($addend->getX()), $byteLen, "\x00", STR_PAD_LEFT);
+        $y1Bin = str_pad($math->toString($this->y), $byteLen, "\x00", STR_PAD_LEFT);
+        $y2Bin = str_pad($math->toString($addend->getY()), $byteLen, "\x00", STR_PAD_LEFT);
+
+        if (BinaryString::constantTimeCompare($x1Bin, $x2Bin)) {
+            if (BinaryString::constantTimeCompare($y1Bin, $y2Bin)) {
                 return $this->getDouble();
-            } else {
-                return $this->curve->getInfinity();
             }
+            return $this->curve->getInfinity();
         }
 
-        $slope = $modMath->div(
-            $math->sub($addend->getY(), $this->y),
-            $math->sub($addend->getX(), $this->x)
-        );
+        // Blind modular inversion in slope calculation to eliminate GMP timing side-channel
+        $blindBytes = random_bytes(max(32, $byteLen));
+        $blind = gmp_mod(gmp_import($blindBytes, 1, GMP_MSW_FIRST | GMP_BIG_ENDIAN), $prime);
+        if (gmp_cmp($blind, 0) === 0) {
+            $blind = gmp_init(1, 10);
+        }
+
+        $dy = $modMath->sub($addend->getY(), $this->y);
+        $dx = $modMath->sub($addend->getX(), $this->x);
+        $blindedDy = $modMath->mul($dy, $blind);
+        $blindedDx = $modMath->mul($dx, $blind);
+        $slope = $modMath->div($blindedDy, $blindedDx);
 
         $xR = $modMath->sub(
             $math->sub($math->pow($slope, 2), $this->x),
@@ -211,10 +163,6 @@ class Point implements PointInterface
         return $this->curve->getPoint($xR, $yR, $this->order);
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::cmp()
-     */
     public function cmp(PointInterface $other): int
     {
         if ($other->isInfinity() && $this->isInfinity()) {
@@ -226,30 +174,27 @@ class Point implements PointInterface
         }
 
         $math = $this->adapter;
-        $equal = ($math->equals($this->x, $other->getX()));
-        $equal &= ($math->equals($this->y, $other->getY()));
-        $equal &= $this->isInfinity() == $other->isInfinity();
-        $equal &= $this->curve->equals($other->getCurve());
+        $byteLen = (int) ceil($this->curve->getSize() / 8);
+        $x1 = str_pad($math->toString($this->x), $byteLen, "\x00", STR_PAD_LEFT);
+        $x2 = str_pad($math->toString($other->getX()), $byteLen, "\x00", STR_PAD_LEFT);
+        $y1 = str_pad($math->toString($this->y), $byteLen, "\x00", STR_PAD_LEFT);
+        $y2 = str_pad($math->toString($other->getY()), $byteLen, "\x00", STR_PAD_LEFT);
 
-        if ($equal) {
-            return 0;
-        }
+        $equal = BinaryString::constantTimeCompare($x1, $x2)
+            && BinaryString::constantTimeCompare($y1, $y2)
+            && ($this->isInfinity() === $other->isInfinity())
+            && $this->curve->equals($other->getCurve());
 
-        return 1;
+        return $equal ? 0 : 1;
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::equals()
-     */
     public function equals(PointInterface $other): bool
     {
-        return $this->cmp($other) == 0;
+        return $this->cmp($other) === 0;
     }
 
     /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::mul()
+     * Constant-time scalar multiplication with scalar blinding (CVE-2024-33851 & GHSA-346h-749j-r28w)
      */
     public function mul(\GMP $n): PointInterface
     {
@@ -258,12 +203,25 @@ class Point implements PointInterface
         }
 
         $zero = gmp_init(0, 10);
-        if ($this->adapter->cmp($this->order, $zero) > 0) {
+        $hasOrder = $this->adapter->cmp($this->order, $zero) > 0;
+        if ($hasOrder) {
             $n = $this->adapter->mod($n, $this->order);
         }
 
         if ($this->adapter->equals($n, $zero)) {
             return $this->curve->getInfinity();
+        }
+
+        // Scalar blinding: n' = n + r * order (where r is a 64-bit random blinding factor)
+        // Ensures bit-length and Hamming weight of scalar do not leak secret key/nonce bits
+        $k = $this->curve->getSize();
+        if ($hasOrder) {
+            $rBlind = gmp_import(random_bytes(8), 1, GMP_MSW_FIRST | GMP_BIG_ENDIAN);
+            $rBlind = gmp_setbit($rBlind, 63);
+            $nWork = $this->adapter->add($n, $this->adapter->mul($rBlind, $this->order));
+            $k = $k + 65;
+        } else {
+            $nWork = $n;
         }
 
         /** @var Point[] $r */
@@ -272,18 +230,19 @@ class Point implements PointInterface
             clone $this
         ];
 
-        $k = $this->curve->getSize();
-        $n = str_pad($this->adapter->baseConvert($this->adapter->toString($n), 10, 2), $k, '0', STR_PAD_LEFT);
+        $nBin = str_pad($this->adapter->baseConvert($this->adapter->toString($nWork), 10, 2), $k, '0', STR_PAD_LEFT);
+        $k = strlen($nBin);
+        $curveSize = max($this->curve->getSize(), $k);
 
         for ($i = 0; $i < $k; $i++) {
-            $j = $n[$i];
+            $j = ord($nBin[$i]) - 48;
 
-            $this->cswap($r[0], $r[1], $j ^ 1, $k);
+            $this->cswap($r[0], $r[1], $j ^ 1, $curveSize);
 
             $r[0] = $r[0]->add($r[1]);
             $r[1] = $r[1]->getDouble();
 
-            $this->cswap($r[0], $r[1], $j ^ 1, $k);
+            $this->cswap($r[0], $r[1], $j ^ 1, $curveSize);
         }
 
         $r[0]->validate();
@@ -291,12 +250,6 @@ class Point implements PointInterface
         return $r[0];
     }
 
-    /**
-     * @param Point $a
-     * @param Point $b
-     * @param int $cond
-     * @param int $curveSize
-     */
     private function cswap(self $a, self $b, int $cond, int $curveSize)
     {
         $this->cswapValue($a->x, $b->x, $cond, $curveSize);
@@ -305,12 +258,6 @@ class Point implements PointInterface
         $this->cswapValue($a->infinity, $b->infinity, $cond, 8);
     }
 
-    /**
-     * @param bool|\GMP $a
-     * @param bool|\GMP $b
-     * @param int $cond
-     * @param int $maskBitSize
-     */
     public function cswapValue(& $a, & $b, int $cond, int $maskBitSize)
     {
         $isGMP = is_object($a) && $a instanceof \GMP;
@@ -318,7 +265,8 @@ class Point implements PointInterface
         $sa = $isGMP ? $a : gmp_init(intval($a), 10);
         $sb = $isGMP ? $b : gmp_init(intval($b), 10);
 
-        $mask = str_pad('', $maskBitSize, (string) (1 - intval($cond)), STR_PAD_LEFT);
+        $bit = (string) ((1 - intval($cond)) & 1);
+        $mask = str_pad('', $maskBitSize, $bit, STR_PAD_LEFT);
         $mask = gmp_init($mask, 2);
 
         $taA = $this->adapter->bitwiseAnd($sa, $mask);
@@ -332,9 +280,6 @@ class Point implements PointInterface
         $b = $isGMP ? $sb : (bool) gmp_strval($sb, 10);
     }
 
-    /**
-     *
-     */
     private function validate()
     {
         if (! $this->infinity && ! $this->curve->contains($this->x, $this->y)) {
@@ -342,11 +287,6 @@ class Point implements PointInterface
         }
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::getDouble()
-     * @return self
-     */
     public function getDouble(): PointInterface
     {
         if ($this->isInfinity()) {
@@ -355,14 +295,24 @@ class Point implements PointInterface
 
         $math = $this->adapter;
         $modMath = $this->modAdapter;
+        $prime = $this->curve->getPrime();
+
+        $zero = gmp_init(0, 10);
+        if ($math->equals($this->y, $zero)) {
+            return $this->curve->getInfinity();
+        }
 
         $a = $this->curve->getA();
         $threeX2 = $math->mul(gmp_init(3, 10), $math->pow($this->x, 2));
 
-        $tangent = $modMath->div(
-            $math->add($threeX2, $a),
-            $math->mul(gmp_init(2, 10), $this->y)
-        );
+        // Blind modular division in point doubling (GHSA-346h-749j-r28w)
+        $blind = gmp_mod(gmp_import(random_bytes(32), 1, GMP_MSW_FIRST | GMP_BIG_ENDIAN), $prime);
+        if (gmp_cmp($blind, 0) === 0) {
+            $blind = gmp_init(1, 10);
+        }
+        $num = $modMath->mul($math->add($threeX2, $a), $blind);
+        $den = $modMath->mul($math->mul(gmp_init(2, 10), $this->y), $blind);
+        $tangent = $modMath->div($num, $den);
 
         $x3 = $modMath->sub(
             $math->pow($tangent, 2),
@@ -377,10 +327,6 @@ class Point implements PointInterface
         return $this->curve->getPoint($x3, $y3, $this->order);
     }
 
-    /**
-     * {@inheritDoc}
-     * @see \Mdanter\Ecc\Primitives\PointInterface::__toString()
-     */
     public function __toString(): string
     {
         if ($this->infinity) {
@@ -390,9 +336,6 @@ class Point implements PointInterface
         return "[ (" . $this->adapter->toString($this->x) . "," . $this->adapter->toString($this->y) . ') on ' . (string) $this->curve . ' ]';
     }
 
-    /**
-     * @return array
-     */
     public function __debugInfo(): array
     {
         $info = [

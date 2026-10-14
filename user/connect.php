@@ -15,10 +15,10 @@ if(isset($_GET['act']) && $_GET['act']=='qrlogin' && $conf['login_qq']==2){
 				exit('{"code":-1,"msg":"当前QQ已绑定商户ID:'.$uid.'，请勿重复绑定！"}');
 			}
 			$DB->insert('log', ['uid'=>$uid, 'type'=>'QQ快捷登录', 'date'=>'NOW()', 'ip'=>$clientip, 'city'=>$city]);
-			$session=md5($uid.$key.$password_hash);
+			$session=md5($uid.$key.$userrow['pwd'].$password_hash);
 			$expiretime=time()+2592000;
 			$token=authcode("{$uid}\t{$session}\t{$expiretime}", 'ENCODE', SYS_KEY);
-			setcookie("user_token", $token, ['expires'=>time() + 2592000, 'path'=>'/', 'secure'=>true, 'httponly'=>true, 'samesite'=>'Strict']);
+			setcookie("user_token", $token, ['expires'=>time() + 2592000, 'path'=>'/', 'secure'=>isset($_SERVER['HTTPS']), 'httponly'=>true, 'samesite'=>'Strict']);
 			$DB->exec("update `pre_user` set `lasttime`=NOW() where `uid`=:uid", [':uid'=>$uid]);
 			$result=array("code"=>0,"msg"=>"登录成功！正在跳转到用户中心","url"=>"./");
 		}elseif($islogin2==1){
@@ -82,10 +82,10 @@ if($_GET['code'] && ($conf['login_qq']==1 || $conf['login_qq']==3 || $conf['logi
 			exit("<script language='javascript'>alert('当前{$typename}已绑定商户ID:{$uid}，请勿重复绑定！');window.location.href='./editinfo.php';</script>");
 		}
 		$DB->insert('log', ['uid'=>$uid, 'type'=>$typename.'快捷登录', 'date'=>'NOW()', 'ip'=>$clientip, 'city'=>$city]);
-		$session=md5($uid.$key.$password_hash);
+		$session=md5($uid.$key.$userrow['pwd'].$password_hash);
 		$expiretime=time()+2592000;
 		$token=authcode("{$uid}\t{$session}\t{$expiretime}", 'ENCODE', SYS_KEY);
-		setcookie("user_token", $token, ['expires'=>time() + 2592000, 'path'=>'/', 'secure'=>true, 'httponly'=>true, 'samesite'=>'Strict']);
+		setcookie("user_token", $token, ['expires'=>time() + 2592000, 'path'=>'/', 'secure'=>isset($_SERVER['HTTPS']), 'httponly'=>true, 'samesite'=>'Strict']);
 		$DB->exec("update `pre_user` set `lasttime`=NOW() where `uid`=:uid", [':uid'=>$uid]);
 		exit("<script language='javascript'>window.location.href='./';</script>");
 	}elseif($islogin2==1){

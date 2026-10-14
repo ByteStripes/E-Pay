@@ -347,13 +347,13 @@ class Payment {
         return $flag;
     }
 
-    // 订单回调处理
+    // 订单回调处理（安全加固：使用 WHERE status IN (0,4) 原子CAS更新防止并发/重放双花盗刷）
     static public function processOrder($isnotify, $order, $api_trade_no, $buyer = null, $bill_trade_no = null, $bill_mch_trade_no = null, $end_time = null){
         global $DB,$conf,$siteurl;
         if($order['status']==0 || $order['status']==4){
-            if($DB->exec("UPDATE `pre_order` SET `status`=1 WHERE `trade_no`=:trade_no", [':trade_no'=>$order['trade_no']])){
+            if($DB->exec("UPDATE pre_order SET status=1 WHERE trade_no=:trade_no AND status IN (0,4)", [':trade_no'=>$order['trade_no']])){
 
-                $data = ['endtime'=>'NOW()', 'date'=>'CURDATE()'];
+                $data = ['endtime'=>'NOW()', 'date'=>'CURRENT_DATE'];
                 if(!empty($api_trade_no)){
                     $data['api_trade_no'] = $api_trade_no;
                     $order['api_trade_no'] = $api_trade_no;
@@ -366,7 +366,7 @@ class Payment {
                 if(!empty($bill_mch_trade_no)) $data['bill_mch_trade_no'] = $bill_mch_trade_no;
                 if(!empty($end_time)){
                     $data['endtime'] = $end_time;
-                    $date['date'] = date('Y-m-d', strtotime($end_time));
+                    $data['date'] = date('Y-m-d', strtotime($end_time));
                 }
                 if($order['settle']>0) $data['settle'] = $order['settle'];
                 $DB->update('order', $data, ['trade_no'=>$order['trade_no']]);
@@ -733,7 +733,7 @@ class Payment {
     //支付宝直付通&微信收付通延迟结算处理
     public static function settle_task(){
         global $DB;
-        $orders = $DB->getAll("SELECT A.*,B.plugin FROM pre_order A LEFT JOIN pre_channel B ON A.channel=B.id WHERE A.status=1 AND A.settle=1 AND A.addtime<DATE_SUB(NOW(), INTERVAL 24 HOUR) AND B.plugin in ('alipayd','wxpaynp') ORDER BY A.trade_no ASC LIMIT 10");
+        $orders = $DB->getAll("SELECT A.*,B.plugin FROM pre_order A LEFT JOIN pre_channel B ON A.channel=B.id WHERE A.status=1 AND A.settle=1 AND A.addtime<(NOW() - INTERVAL '24 HOUR') AND B.plugin in ('alipayd','wxpaynp') ORDER BY A.trade_no ASC LIMIT 10");
         foreach($orders as $row){
             $trade_no = $row['trade_no'];
             $channel = $row['subchannel'] > 0 ? \lib\Channel::getSub($row['subchannel']) : \lib\Channel::get($row['channel'], $DB->findColumn('user', 'channelinfo', ['uid'=>$row['uid']]));

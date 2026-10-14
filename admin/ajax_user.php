@@ -60,7 +60,7 @@ case 'userList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_user WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_user WHERE{$sql} order by {$order} limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_user WHERE{$sql} order by {$order} LIMIT $limit OFFSET $offset", $params);
 	$list2 = [];
 	foreach($list as $row){
 		if($row['endtime']!=null && strtotime($row['endtime'])<time()){
@@ -105,7 +105,7 @@ case 'recordList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_record WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_record WHERE{$sql} order by id desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_record WHERE{$sql} order by id desc LIMIT $limit OFFSET $offset", $params);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -308,13 +308,13 @@ case 'buyerStat':
 		$sql.=" AND `type`=:type";
 		$bs_params[':type'] = $type;
 	}
-	$list = $DB->getAll("SELECT A.*,ISNULL(B.id) is_black
-		FROM (SELECT {$column} `user`,COUNT(*) AS order_count,MAX(trade_no) trade_no
-		FROM pay_order
+	$list = $DB->getAll("SELECT A.*,(CASE WHEN B.id IS NULL THEN 1 ELSE 0 END) is_black
+		FROM (SELECT {$column} AS \"user\",COUNT(*) AS order_count,MAX(trade_no) AS trade_no
+		FROM pre_order
 		WHERE {$sql}
 		GROUP BY {$column}
 		ORDER BY order_count DESC) A
-		LEFT JOIN pay_blacklist B ON A.`user`=B.content", $bs_params);
+		LEFT JOIN pre_blacklist B ON A.\"user\"=B.content", $bs_params);
 	exit(json_encode($list));
 break;
 
@@ -332,7 +332,7 @@ case 'logList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_log WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_log WHERE{$sql} order by id desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_log WHERE{$sql} order by id desc LIMIT $limit OFFSET $offset", $params);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -357,7 +357,7 @@ case 'domainList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_domain WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_domain WHERE{$sql} order by id desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_domain WHERE{$sql} order by id desc LIMIT $limit OFFSET $offset", $params);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -377,7 +377,7 @@ case 'blackList':
 	$offset = intval($_POST['offset']);
 	$limit = intval($_POST['limit']);
 	$total = $DB->getColumn("SELECT count(*) from pre_blacklist WHERE{$sql}", $params);
-	$list = $DB->getAll("SELECT * FROM pre_blacklist WHERE{$sql} order by id desc limit $offset,$limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_blacklist WHERE{$sql} order by id desc LIMIT $limit OFFSET $offset", $params);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -483,7 +483,7 @@ case 'addUser':
 	$uid = $DB->insert('user', $data);
 	if($uid!==false){
 		if(!empty($_POST['pwd'])){
-			$pwd = getMd5Pwd(trim($_POST['pwd']), $uid);
+			$pwd = hashPassword(trim($_POST['pwd']));
 			$DB->update('user', ['pwd'=>$pwd], ['uid'=>$uid]);
 		}
 		exit(json_encode(['code'=>0, 'uid'=>$uid, 'key'=>$key]));
@@ -525,7 +525,7 @@ case 'editUser':
 
 	if($DB->update('user', $data, ['uid'=>$uid])!==false){
 		if(!empty($_POST['pwd'])){
-			$pwd = getMd5Pwd(trim($_POST['pwd']), $uid);
+			$pwd = hashPassword(trim($_POST['pwd']));
 			$DB->update('user', ['pwd'=>$pwd], ['uid'=>$uid]);
 		}
 		exit('{"code":0}');

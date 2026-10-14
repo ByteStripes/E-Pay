@@ -404,6 +404,9 @@ html{background:#eee}body{background:#fff;color:#333;font-family:"微软雅黑",
     exit;
 }
 function returnTemplate($return_url) {
+	if (!preg_match('#^https?://#i', (string)$return_url) && substr((string)$return_url, 0, 1) !== '/') {
+		$return_url = '/';
+	}
 	$url = htmlspecialchars(base64_encode($return_url), ENT_QUOTES|ENT_HTML5, 'UTF-8');
     ?>
     <!DOCTYPE html>
@@ -458,18 +461,43 @@ function getSid() {
     return bin2hex(random_bytes(16));
 }
 function getMd5Pwd($pwd, $salt=null) {
-    return md5(md5($pwd) . md5($salt));
+    return md5(md5((string)$pwd) . md5((string)$salt));
 }
 
 function hashPassword($pwd) {
-    return password_hash($pwd, PASSWORD_ARGON2ID);
+    $algo = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
+    return password_hash((string)$pwd, $algo);
 }
 
 function verifyPassword($pwd, $hash, $salt=null) {
-    if (str_starts_with($hash, '$argon2id$') || str_starts_with($hash, '$2y$')) {
-        return password_verify($pwd, $hash);
+    $hash = (string)$hash;
+    if ($hash === '') return false;
+    if (strpos($hash, '$argon2') === 0 || strpos($hash, '$2y$') === 0 || strpos($hash, '$2a$') === 0) {
+        return password_verify((string)$pwd, $hash);
     }
     return hash_equals(getMd5Pwd($pwd, $salt), $hash);
+}
+
+function verifyAdminPwd($pwd) {
+    global $conf;
+    $stored = isset($conf['admin_pwd']) ? (string)$conf['admin_pwd'] : '';
+    if ($stored === '') return false;
+    $info = password_get_info($stored);
+    if ($info['algo'] !== null && $info['algo'] !== 0) {
+        return password_verify((string)$pwd, $stored);
+    }
+    return hash_equals($stored, (string)$pwd);
+}
+
+function verifyAdminPayPwd($pwd) {
+    global $conf;
+    $stored = isset($conf['admin_paypwd']) ? (string)$conf['admin_paypwd'] : '';
+    if ($stored === '' || (string)$pwd === '') return false;
+    $info = password_get_info($stored);
+    if ($info['algo'] !== null && $info['algo'] !== 0) {
+        return password_verify((string)$pwd, $stored);
+    }
+    return hash_equals($stored, (string)$pwd);
 }
 
 // 生成安全的订单号
@@ -512,7 +540,7 @@ function getSetting($k, $force = false){
 }
 function saveSetting($k, $v){
 	global $DB;
-	return $DB->exec("REPLACE INTO pre_config SET v=:v,k=:k", [':v'=>$v, ':k'=>$k]);
+	return $DB->exec("INSERT INTO pre_config (k, v) VALUES (:k, :v) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v", [':v'=>$v, ':k'=>$k]);
 }
 function checkGroupSettings($str){
 	foreach(explode(',',$str) as $row){
@@ -682,8 +710,8 @@ function processOrder(&$srow,$notify=true){
 			$paystatus = $conf['user_review']==1?2:1;
 			$sds=$DB->exec("INSERT INTO `pre_user` (`upid`, `key`, `money`, `email`, `phone`, `addtime`, `pay`, `settle`, `keylogin`, `apply`, `status`) VALUES (:upid, :key, '0.00', :email, :phone, NOW(), :paystatus, 1, 0, 0, 1)", [':upid'=>$info['upid'], ':key'=>$key, ':email'=>$info['email'], ':phone'=>$info['phone'], ':paystatus'=>$paystatus]);
 			$uid=$DB->lastInsertId();
-		$pwd = getMd5Pwd($info['pwd'], $uid);
-		$DB->exec("UPDATE `pre_user` SET `pwd`=:pwd WHERE `uid`=:uid", [':pwd'=>$pwd, ':uid'=>$uid]);
+		$pwd = hashPassword($info['pwd']);
+		$DB->exec("UPDATE pre_user SET pwd=:pwd WHERE uid=:uid", [':pwd'=>$pwd, ':uid'=>$uid]);
 			if($sds){
 				if(!empty($info['email'])){
 					$sub = $conf['sitename'].' - 注册成功通知';
@@ -756,7 +784,7 @@ function processOrder(&$srow,$notify=true){
 		if(do_notify($url['notify'])){
 			$DB->exec("UPDATE pre_order SET notify=0 WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
 		}elseif($notify==true){
-			$DB->exec("UPDATE pre_order SET notify=1,notifytime=date_add(now(), interval 1 minute) WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
+			$DB->exec("UPDATE pre_order SET notify=1,notifytime=(NOW() + INTERVAL '1 MINUTE') WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
 		}
 	}
 	if($srow['tid']==0 || $srow['tid']==3){
@@ -799,7 +827,7 @@ function processOrder(&$srow,$notify=true){
 		}
 	}
 	if($channel['daymaxorder'] > 0){
-		$orders = $DB->getColumn("SELECT COUNT(*) FROM pre_order WHERE channel=:channel AND status>0 AND date=CURDATE()", [':channel'=>$channel['id']]);
+		$orders = $DB->getColumn("SELECT COUNT(*) FROM pre_order WHERE channel=:channel AND status>0 AND date=CURRENT_DATE", [':channel'=>$channel['id']]);
 		if($orders >= $channel['daymaxorder']){
 			$DB->exec("UPDATE pre_channel SET daystatus=1 WHERE id=:id", [':id'=>$channel['id']]);
 		}
@@ -846,11 +874,11 @@ function changeUserMoney($uid, $money, $add=true, $type=null, $orderid=null, $ow
 	if($money<=0)return;
 	if($ownTransaction) $DB->beginTransaction();
 	$oldmoney = $DB->getColumn("SELECT money FROM pre_user WHERE uid=:uid LIMIT 1 FOR UPDATE", [':uid'=>$uid]);
-	if($type=='代付退回' && !empty($orderid)){
-		$isrefund = $DB->getColumn("SELECT id FROM pre_record WHERE uid=:uid AND type='代付退回' AND trade_no=:orderid LIMIT 1", [':uid'=>$uid, ':orderid'=>$orderid]);
-		if($isrefund){
+	if(!empty($orderid) && in_array($type, ['代付退回', '订单收入', '订单充值', '邀请返现', '结算失败退回'], true)){
+		$isdup = $DB->getColumn("SELECT id FROM pre_record WHERE uid=:uid AND type=:type AND trade_no=:orderid LIMIT 1", [':uid'=>$uid, ':type'=>$type, ':orderid'=>$orderid]);
+		if($isdup){
 			if($ownTransaction) $DB->commit();
-			return;
+			return false;
 		}
 	}
 	if($add == true){
@@ -1182,8 +1210,8 @@ function checkPayVerifyOpen($pid){
 		$count = intval($conf['pay_verify_check_count']);
 		$sucrate = floatval($conf['pay_verify_check_rate']);
 		if($second>0 || $count>0 || $sucrate>0){
-			$total_num=$DB->getColumn("SELECT count(*) FROM pre_order WHERE uid=:uid AND addtime>=DATE_SUB(NOW(), INTERVAL ".intval($second)." SECOND)", [':uid'=>$pid]);
-			$succ_num=$DB->getColumn("SELECT count(*) FROM pre_order WHERE uid=:uid AND addtime>=DATE_SUB(NOW(), INTERVAL ".intval($second)." SECOND) AND status>0", [':uid'=>$pid]);
+			$total_num=$DB->getColumn("SELECT count(*) FROM pre_order WHERE uid=:uid AND addtime>=(NOW() - INTERVAL '".intval($second)." SECOND')", [':uid'=>$pid]);
+			$succ_num=$DB->getColumn("SELECT count(*) FROM pre_order WHERE uid=:uid AND addtime>=(NOW() - INTERVAL '".intval($second)." SECOND') AND status>0", [':uid'=>$pid]);
 			if($total_num >= $count){
 				$succ_rate = round($succ_num * 100 / $total_num, 2);
 				if($succ_rate < $sucrate){
@@ -1193,7 +1221,7 @@ function checkPayVerifyOpen($pid){
 		}
 		$ipcheck = intval($conf['pay_verify_check_ip']);
 		if($ipcheck>0){
-			$orders = $DB->getAll("SELECT status FROM pre_order WHERE `ip`=:ip AND addtime>=DATE_SUB(NOW(), INTERVAL 3600 SECOND) ORDER BY addtime DESC LIMIT ".intval($ipcheck), [':ip'=>$clientip]);
+			$orders = $DB->getAll("SELECT status FROM pre_order WHERE ip=:ip AND addtime>=(NOW() - INTERVAL '3600 SECOND') ORDER BY addtime DESC LIMIT ".intval($ipcheck), [':ip'=>$clientip]);
 			$fail_num = 0;
 			foreach($orders as $row){
 				if($row['status'] == 0) $fail_num++;

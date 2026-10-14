@@ -35,8 +35,7 @@ if(isset($_POST['submit'])){
 	$title = isset($_POST['title'])?htmlspecialchars(trim($_POST['title'])):'';
 	$desc = htmlspecialchars(trim($_POST['desc']));
 	$pwd = trim($_POST['paypwd']);
-	$pwdenc = getMd5Pwd($pwd, $userrow['uid']);
-	if(empty($pwd) || $pwdenc!==$userrow['pwd'])showmsg('登录密码输入错误',3);
+	if(empty($pwd) || !verifyPassword($pwd, $userrow['pwd'], $userrow['uid']))showmsg('登录密码输入错误',3);
 	if(empty($out_biz_no) || empty($payee_account) || empty($money))showmsg('必填项不能为空',3);
 	if(strlen($out_biz_no)!=19 || !is_numeric($out_biz_no))showmsg('交易号输入不规范',3);
 	if($desc && mb_strlen($desc)>32)showmsg('转账备注最多32个字',3);
@@ -79,7 +78,7 @@ if($conf['settle_type']==1){
 
 $copy = [];
 if(isset($_GET['copy'])){
-	$copy = $DB->find('transfer', '*', ['biz_no'=>trim($_GET['copy'])]);
+	$copy = $DB->find('transfer', '*', ['biz_no'=>trim($_GET['copy']), 'uid'=>$uid]);
 }
 ?>
 	<div class="panel panel-default">

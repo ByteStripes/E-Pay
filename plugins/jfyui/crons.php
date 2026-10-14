@@ -16,21 +16,19 @@ foreach ($channels as $id) {
 	// 检索订单数据
 	$id = intval($id);
 	$channel = $DB->getRow('SELECT * FROM pre_channel WHERE id = ? LIMIT 1', [$id]);
-	$query = "SELECT trade_no,uid,api_trade_no,subchannel FROM pre_order WHERE addtime >= DATE_SUB('{$sotime}', INTERVAL 3 MINUTE) AND status = 0 AND channel = '{$id}'";
-	$result = $DB->query($query);
-	$orders = $result->fetchAll(PDO::FETCH_ASSOC);
+	$orders = $DB->getAll("SELECT trade_no,uid,api_trade_no,subchannel FROM pre_order WHERE addtime >= (:sotime::timestamp - INTERVAL '3 MINUTE') AND status = 0 AND channel = :id", [':sotime'=>$sotime, ':id'=>$id]);
 	if (empty($orders)) {
 		echo "通道ID为 {$id} 的通道暂无需监控订单\n";
 	} else {
 		foreach ($orders as $order) {
 			// 子通道
 			if (!empty($order['subchannel']) && $order['subchannel'] != 0) {
-				$channelInfo = $DB->getColumn("SELECT info FROM pre_subchannel WHERE id='{$order['subchannel']}' LIMIT 1");
+				$channelInfo = $DB->getColumn("SELECT info FROM pre_subchannel WHERE id=:scid LIMIT 1", [':scid'=>intval($order['subchannel'])]);
 				$channel = \lib\Channel::get($id, $channelInfo);
 			} else {
 				// 非子直清
 				if ($channel['mode'] == 1) {
-					$channelInfo = $DB->getColumn("SELECT channelinfo FROM pre_user WHERE uid='{$order['uid']}' LIMIT 1");
+					$channelInfo = $DB->getColumn("SELECT channelinfo FROM pre_user WHERE uid=:uid LIMIT 1", [':uid'=>intval($order['uid'])]);
 					$channel = \lib\Channel::get($id, $channelInfo);
 				} else {
 					// 非子代收

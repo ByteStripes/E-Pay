@@ -132,7 +132,7 @@ case 'getcount':
 		$order_today = round($DB->getColumn("SELECT sum(money) FROM pre_order WHERE uid=:uid AND status=1 AND date=:today AND type=:typeid", [':uid'=>$uid, ':today'=>$today, ':typeid'=>$row['id']]),2);
 		$order_lastday = round($DB->getColumn("SELECT sum(money) FROM pre_order WHERE uid=:uid AND status=1 AND date=:lastday AND type=:typeid", [':uid'=>$uid, ':lastday'=>$lastday, ':typeid'=>$row['id']]),2);
 
-		$orderrow = $DB->getRow("SELECT COUNT(*) allnum,COUNT(IF(status>0, 1, NULL)) sucnum FROM pre_order WHERE uid=:uid AND addtime>=:today AND type=:typeid", [':uid'=>$uid, ':today'=>$today, ':typeid'=>$row['id']]);
+		$orderrow = $DB->getRow("SELECT COUNT(*) allnum,COUNT(CASE WHEN status>0 THEN 1 ELSE NULL END) sucnum FROM pre_order WHERE uid=:uid AND addtime>=:today AND type=:typeid", [':uid'=>$uid, ':today'=>$today, ':typeid'=>$row['id']]);
 		$success_rate = $orderrow && $orderrow['allnum'] > 0 ? round($orderrow['sucnum']/$orderrow['allnum']*100,2) : 100;
 
 		$channels[] = ['name'=>$row['name'], 'showname'=>$row['showname'], 'rate'=>round(100-$row['rate'], 2), 'order_today'=>$order_today, 'order_lastday'=>$order_lastday, 'success_rate'=>$success_rate];
@@ -515,7 +515,7 @@ case 'edit_pwd':
 	if(!empty($userrow['pwd']) && $oldpwd==null || $newpwd==null || $newpwd2==null){
 		exit('{"code":-1,"msg":"请确保每项都不为空"}');
 	}
-	if(!empty($userrow['pwd']) && !hash_equals($userrow['pwd'], getMd5Pwd($oldpwd, $uid))){
+	if(!empty($userrow['pwd']) && !verifyPassword($oldpwd, $userrow['pwd'], $uid)){
 		exit('{"code":-1,"msg":"旧密码不正确"}');
 	}
 	if($newpwd!==$newpwd2){
@@ -533,8 +533,8 @@ case 'edit_pwd':
 	}elseif (is_numeric($newpwd)) {
 		exit('{"code":-1,"msg":"新密码不能为纯数字"}');
 	}
-	$pwd = getMd5Pwd($newpwd, $uid);
-	$sqs=$DB->exec("update `pre_user` set `pwd` =:pwd where `uid`=:uid", [':pwd'=>$pwd, ':uid'=>$uid]);
+	$pwd = hashPassword($newpwd);
+	$sqs=$DB->exec("UPDATE pre_user SET pwd=:pwd WHERE uid=:uid", [':pwd'=>$pwd, ':uid'=>$uid]);
 	if($sqs!==false){
 		exit('{"code":1,"msg":"修改密码成功！请牢记新密码"}');
 	}else{
@@ -872,8 +872,11 @@ case 'groupbuy':
 		$endtime = null;
 	}
 	if($typeid==0){
+		if($money<=0)exit('{"code":-1,"msg":"金额不合法"}');
 		if($money>$userrow['money'])exit('{"code":-1,"msg":"余额不足，请选择其他方式支付"}');
-		changeUserMoney($uid, $money, false, '购买会员');
+		if(!changeUserMoney($uid, $money, false, '购买会员')){
+			exit('{"code":-1,"msg":"余额不足，请选择其他方式支付"}');
+		}
 		changeUserGroup($uid, $gid, $endtime);
 
 		if($userrow['upid'] > 0){
@@ -1010,7 +1013,7 @@ case 'orderList':
 	$total = $DB->getColumn("SELECT count(*) from pre_order A WHERE{$sql}", $params);
 	$params[':offset'] = $offset;
 	$params[':limit'] = $limit;
-	$list = $DB->getAll("SELECT A.*,B.plugin,C.apply_id submchid FROM pre_order A LEFT JOIN pre_channel B ON A.channel=B.id LEFT JOIN pre_subchannel C ON A.subchannel=C.id WHERE{$sql} order by trade_no desc limit :offset,:limit", $params);
+	$list = $DB->getAll("SELECT A.*,B.plugin,C.apply_id submchid FROM pre_order A LEFT JOIN pre_channel B ON A.channel=B.id LEFT JOIN pre_subchannel C ON A.subchannel=C.id WHERE{$sql} order by trade_no desc LIMIT :limit OFFSET :offset", $params);
 	$list2 = [];
 	foreach($list as $row){
 		$row['typename'] = $paytypes[$row['type']];
@@ -1142,7 +1145,7 @@ case 'recordList':
 	$total = $DB->getColumn("SELECT count(*) from pre_record WHERE{$sql}", $params);
 	$params[':offset'] = $offset;
 	$params[':limit'] = $limit;
-	$list = $DB->getAll("SELECT * FROM pre_record WHERE{$sql} order by id desc limit :offset,:limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_record WHERE{$sql} order by id desc LIMIT :limit OFFSET :offset", $params);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -1160,7 +1163,7 @@ case 'settleList':
 	$total = $DB->getColumn("SELECT count(*) from pre_settle WHERE{$sql}", $params);
 	$params[':offset'] = $offset;
 	$params[':limit'] = $limit;
-	$list = $DB->getAll("SELECT * FROM pre_settle WHERE{$sql} order by id desc limit :offset,:limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_settle WHERE{$sql} order by id desc LIMIT :limit OFFSET :offset", $params);
 	$list2 = [];
 	foreach($list as $row){
 		if($row['type'] == 2 && $row['status'] == 1 && !empty($row['transfer_ext']) && time() - strtotime($row['transfer_date']) <= 86400){
@@ -1228,7 +1231,7 @@ case 'transferList':
 	$total = $DB->getColumn("SELECT count(*) from pre_transfer WHERE{$sql}", $params);
 	$params[':offset'] = $offset;
 	$params[':limit'] = $limit;
-	$list = $DB->getAll("SELECT * FROM pre_transfer WHERE{$sql} order by biz_no desc limit :offset,:limit", $params);
+	$list = $DB->getAll("SELECT * FROM pre_transfer WHERE{$sql} order by biz_no desc LIMIT :limit OFFSET :offset", $params);
 	$list2 = [];
 	foreach($list as $row){
 		if($row['type'] == 'wxpay' && $row['status'] == 0 && !empty($row['ext'])){
@@ -1340,7 +1343,7 @@ case 'refund_submit': //确认退款
 	$pwd=trim($_POST['pwd']);
 	$money = trim($_POST['money']);
 	if(!is_numeric($money) || !preg_match('/^[0-9.]+$/', $money))exit('{"code":-1,"msg":"金额输入错误"}');
-	if(!hash_equals($userrow['pwd'], getMd5Pwd($pwd, $userrow['uid'])))
+	if(!verifyPassword($pwd, $userrow['pwd'], $userrow['uid']))
 		exit('{"code":-1,"msg":"登录密码输入错误！"}');
 	
 	$refund_no = date("YmdHis").bin2hex(random_bytes(4));
@@ -1369,7 +1372,7 @@ case 'inviteList':
 	$limit = intval($_POST['limit']);
 	if($limit <= 0) $limit = 20;
 	$total = $DB->getColumn("SELECT count(*) from pre_user WHERE upid=:uid", [':uid'=>$uid]);
-	$list = $DB->getAll("SELECT uid,upid,addtime,lasttime,status FROM pre_user WHERE upid=:uid order by uid desc limit :offset,:limit", [':uid'=>$uid, ':offset'=>$offset, ':limit'=>$limit]);
+	$list = $DB->getAll("SELECT uid,upid,addtime,lasttime,status FROM pre_user WHERE upid=:uid order by uid desc LIMIT :limit OFFSET :offset", [':uid'=>$uid, ':offset'=>$offset, ':limit'=>$limit]);
 
 	exit(json_encode(['total'=>$total, 'rows'=>$list]));
 break;
@@ -1415,9 +1418,9 @@ case 'deposit_withdraw':
 	if(!$_POST['csrf_token'] || $_POST['csrf_token']!=$_SESSION['csrf_token'])exit('{"code":-1,"msg":"CSRF TOKEN ERROR"}');
 	if($conf['user_deposit_day']>0){
 		$days = intval($conf['user_deposit_day']);
-		$orders = $DB->getColumn("SELECT count(*) FROM pre_order WHERE uid=:uid AND status=1 AND addtime>DATE_SUB(NOW(),INTERVAL {$days} DAY)", [':uid'=>$uid]);
+		$orders = $DB->getColumn("SELECT count(*) FROM pre_order WHERE uid=:uid AND status=1 AND addtime>(NOW() - INTERVAL '{$days} DAY')", [':uid'=>$uid]);
 		if($orders>0)exit('{"code":-1,"msg":"你在最近'.$days.'天内有订单，无法提取保证金"}');
-		$complains = $DB->getColumn("SELECT count(*) FROM pre_complain WHERE uid=:uid AND addtime>DATE_SUB(NOW(),INTERVAL {$days} DAY)", [':uid'=>$uid]);
+		$complains = $DB->getColumn("SELECT count(*) FROM pre_complain WHERE uid=:uid AND addtime>(NOW() - INTERVAL '{$days} DAY')", [':uid'=>$uid]);
 		if($complains>0)exit('{"code":-1,"msg":"你在最近'.$days.'天内有投诉记录，无法提取保证金"}');
 	}
 	$DB->beginTransaction();

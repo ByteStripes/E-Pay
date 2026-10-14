@@ -24,10 +24,10 @@ if(isset($_GET['act']) && $_GET['act']=='login'){
 			if($islogin2==1){
 				exit('{"code":-1,"msg":"当前微信已绑定商户ID:'.$uid.'，请勿重复绑定！"}');
 			}
-			$session=md5($uid.$key.$password_hash);
+			$session=md5($uid.$key.$userrow['pwd'].$password_hash);
 			$expiretime=time()+2592000;
 			$token=authcode("{$uid}\t{$session}\t{$expiretime}", 'ENCODE', SYS_KEY);
-			setcookie("user_token", $token, ['expires'=>time() + 2592000, 'path'=>'/', 'secure'=>true, 'httponly'=>true, 'samesite'=>'Strict']);
+			setcookie("user_token", $token, ['expires'=>time() + 2592000, 'path'=>'/', 'secure'=>isset($_SERVER['HTTPS']), 'httponly'=>true, 'samesite'=>'Strict']);
 			$DB->exec("update `pre_user` set `lasttime`=NOW() where `uid`=:uid", [':uid'=>$uid]);
 			$result=array("code"=>0,"msg"=>"登录成功！正在跳转到用户中心","url"=>"./");
 		}elseif($islogin2==1){
@@ -100,10 +100,10 @@ $_SESSION['openid'] = $openId;
 		$uid=$userrow['uid'];
 		$key=$userrow['key'];
 		$DB->insert('log', ['uid'=>$uid, 'type'=>'微信快捷登录', 'date'=>'NOW()', 'ip'=>$clientip, 'city'=>$city]);
-		$session=md5($uid.$key.$password_hash);
+		$session=md5($uid.$key.$userrow['pwd'].$password_hash);
 		$expiretime=time()+604800;
 		$token=authcode("{$uid}\t{$session}\t{$expiretime}", 'ENCODE', SYS_KEY);
-		setcookie("user_token", $token, ['expires'=>time() + 604800, 'path'=>'/', 'secure'=>true, 'httponly'=>true, 'samesite'=>'Strict']);
+		setcookie("user_token", $token, ['expires'=>time() + 604800, 'path'=>'/', 'secure'=>isset($_SERVER['HTTPS']), 'httponly'=>true, 'samesite'=>'Strict']);
 		@header('Content-Type: text/html; charset=UTF-8');
 		exit("<script language='javascript'>window.location.href='./{$redirect_url}';</script>");
 	}elseif($islogin2==1){

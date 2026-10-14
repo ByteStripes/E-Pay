@@ -53,24 +53,19 @@ if($arr['cmd'] == 'heartbeat'){
     //  4) 频控：限制同一设备(商户)短时间内的下单频率，缓解重放/刷单。
     $now = time();
     $reqTs = isset($arr['timestamp']) ? intval($arr['timestamp']) : 0;
-    if($reqTs > 0 && abs($now - $reqTs) > 300) voicemsg('请求已过期');
+    if($reqTs <= 0 || abs($now - $reqTs) > 300) voicemsg('请求已过期或缺少时间戳');
+    if(!isset($arr['sign']) || $arr['sign'] === '') voicemsg('缺少设备签名');
 
     $signStr = 'cmd='.$arr['cmd'].'&sn='.$sn.'&data='.$arr['data'].'&money='.$money.'&msgid='.$out_trade_no.'&timestamp='.$reqTs;
-    if(!empty($userrow['device_secret'])){
-        // 强鉴权：设备已配置独立密钥，sign 必填且必须用 device_secret 校验
-        if(!isset($arr['sign']) || $arr['sign'] === '') voicemsg('缺少设备签名');
-        $expectSign = hash_hmac('sha256', $signStr, (string)$userrow['device_secret']);
-        if(!hash_equals($expectSign, (string)$arr['sign'])) voicemsg('签名校验失败');
-    }elseif(isset($arr['sign']) && $arr['sign'] !== ''){
-        // FIXME：兼容回退路径，存量设备未生成 device_secret 时仍用商户 key 校验，应尽快迁移到强鉴权
-        $expectSign = hash_hmac('sha256', $signStr, (string)$userrow['key']);
-        if(!hash_equals($expectSign, (string)$arr['sign'])) voicemsg('签名校验失败');
-    }
+    $secretKey = !empty($userrow['device_secret']) ? (string)$userrow['device_secret'] : (string)$userrow['key'];
+    if($secretKey === '') voicemsg('设备密钥未配置');
+    $expectSign = hash_hmac('sha256', $signStr, $secretKey);
+    if(!hash_equals($expectSign, (string)$arr['sign'])) voicemsg('签名校验失败');
 
-    $dup = $DB->getRow("SELECT `trade_no` FROM `pre_order` WHERE `out_trade_no`=:o AND `uid`=:uid LIMIT 1", [':o'=>$out_trade_no, ':uid'=>$uid]);
+    $dup = $DB->getRow("SELECT trade_no FROM pre_order WHERE out_trade_no=:o AND uid=:uid LIMIT 1", [':o'=>$out_trade_no, ':uid'=>$uid]);
     if($dup) voicemsg('订单号重复，请勿重复提交');
 
-    $rc = $DB->getRow("SELECT COUNT(*) AS c FROM `pre_order` WHERE `uid`=:uid AND `tid`=3 AND `addtime` > DATE_SUB(NOW(), INTERVAL 5 SECOND)", [':uid'=>$uid]);
+    $rc = $DB->getRow("SELECT COUNT(*) AS c FROM pre_order WHERE uid=:uid AND tid=3 AND addtime > (NOW() - INTERVAL '5 SECOND')", [':uid'=>$uid]);
     if($rc && intval($rc['c']) >= 5) voicemsg('请求过于频繁，请稍后再试');
 
     $return_url=$siteurl;

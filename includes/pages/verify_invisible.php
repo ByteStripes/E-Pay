@@ -3,7 +3,7 @@ if (!defined('IN_CRONLITE')) exit();
 
 $html = '<form id="dopay" action="'.$siteurl.'submit.php" method="post">';
 foreach ($query_arr as $k=>$v) {
-    $html.= '<input type="hidden" name="'.$k.'" value="'.$v.'"/>';
+    $html.= '<input type="hidden" name="'.htmlspecialchars((string)$k, ENT_QUOTES, 'UTF-8').'" value="'.htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8').'"/>';
 }
 $html .= '<input type="submit" value="Loading"></form>';
 ?>
@@ -32,7 +32,7 @@ Element.prototype.appendChild = function() {
     return window.appendChildOrg.apply(this, arguments);
 };
 initGeetest4({
-    captchaId: "99b142aaece96330d0f3ffb565ffb3ef",
+    captchaId: <?php echo json_encode(!empty($conf["captcha_id"]) ? $conf["captcha_id"] : "99b142aaece96330d0f3ffb565ffb3ef")?>,
     product: 'bind',
     protocol: 'https://',
     riskType: 'ai',
@@ -41,8 +41,8 @@ initGeetest4({
         captcha.showCaptcha();
     }).onSuccess(function(){
         var result = captcha.getValidate();
-        result.pid = '<?php echo $query_arr['pid']?>';
-        result.trade_no = '<?php echo $query_arr['out_trade_no']?>';
+        result.pid = <?php echo json_encode((string)$query_arr['pid'])?>;
+        result.trade_no = <?php echo json_encode((string)$query_arr['out_trade_no'])?>;
         $.ajax({
             url: 'getshop.php?act=captcha_verify',
             type: 'post',
