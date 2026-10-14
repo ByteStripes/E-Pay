@@ -462,8 +462,8 @@ class adapay_plugin
 				$buyer = $_data['expend']['sub_open_id'];
 				$bill_trade_no = $_data['out_trans_id'];
 				$bill_mch_trade_no = $_data['party_order_id'];
-				if ((string)$trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no);
+				if ((string)$trade_no === (string)TRADE_NO && moneyEquals($orderAmount, $order['realmoney'])) {
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, null, $orderAmount);
 				}
 				return ['type'=>'html','data'=>'Ok'];
 			} else {

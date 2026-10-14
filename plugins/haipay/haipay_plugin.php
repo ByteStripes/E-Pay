@@ -431,8 +431,8 @@ class haipay_plugin
 				$money = $arr['order_amount'];
 				$buyer = $arr['openid'];
 	
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $money);
 				}
 			}
 			return ['type'=>'json','data'=>['return_code'=>'SUCCESS']];

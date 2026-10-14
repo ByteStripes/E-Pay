@@ -620,8 +620,8 @@ class helipay_plugin
 				$buyer = $_POST['rt19_subOpenId'];
 				$bill_trade_no = $_POST['rt17_outTransactionOrderId'];
 
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $money);
 				}
 			}
 			return ['type'=>'html','data'=>'success'];

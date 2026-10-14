@@ -500,8 +500,8 @@ class hnapay_plugin
 				$money = $_POST['tranAmt'];
 				$buyer = $_POST['userId'];
 
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
+					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, null, $money);
 				}
 				return ['type'=>'html','data'=>'200'];
 			}else{
@@ -532,8 +532,8 @@ class hnapay_plugin
 				$money = $_POST['tranAmt'];
 				$buyer = $_POST['userId'];
 
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && intval($money) === intval(round($order['realmoney']*100))) {
+					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, null, $order['realmoney']);
 				}
 				return ['type'=>'html','data'=>'200'];
 			}else{

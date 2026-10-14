@@ -283,8 +283,9 @@ class douyinpay_plugin
 		}
 
 		if ($data['trade_state'] == 'SUCCESS') {
-			if((string)$data['out_trade_no'] === (string)TRADE_NO){
-				processNotify($order, $data['transaction_id'], $data['payer']['openid']);
+			$paidFen = $data['amount']['total'] ?? null;
+			if((string)$data['out_trade_no'] === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))){
+				processNotify($order, $data['transaction_id'], $data['payer']['openid'], null, null, null, $order['realmoney']);
 			}
 		}
 		$client->replyNotify(true);

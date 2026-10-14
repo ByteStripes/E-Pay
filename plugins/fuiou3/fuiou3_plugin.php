@@ -334,8 +334,8 @@ class fuiou3_plugin
 				$buyer = $arr['openid'];
 				$bill_trade_no = $arr['pay_ssn'];
 				$bill_mch_trade_no = $arr['fy_order_id'];
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && intval($money) === intval(round($order['realmoney']*100))){
+					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, null, $order['realmoney']);
 				}
 				return ['type'=>'html','data'=>'success'];
 			}

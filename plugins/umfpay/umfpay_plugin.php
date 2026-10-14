@@ -167,8 +167,9 @@ class umfpay_plugin
 		if($verify_result) {//验证成功
 
 			if ($_GET['trade_state'] == 'TRADE_SUCCESS') {
-				if((string)$_GET['order_id'] === (string)TRADE_NO){
-					processNotify($order, $_GET['trade_no'], $_GET['mer_cust_id']);
+				$paidFen = $_GET['amount'] ?? null;
+				if((string)$_GET['order_id'] === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))){
+					processNotify($order, $_GET['trade_no'], $_GET['mer_cust_id'], null, null, null, $order['realmoney']);
 				}
 			}else{
 				$params['ret_code'] = '0001';

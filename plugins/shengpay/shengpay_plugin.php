@@ -386,8 +386,9 @@ class shengpay_plugin
 				$payerInfo = json_decode($data['payerInfo'], true);
 				$buyer = $payerInfo['openid'];
 				$bill_trade_no = $payerInfo['officOrderNum'];
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $trade_no, $buyer, $bill_trade_no);
+				$paidFen = $data['totalFee'] ?? null;
+				if((string)$out_trade_no === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))){
+					processNotify($order, $trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 				}
 				return ['type'=>'html','data'=>'SUCCESS'];
 			}

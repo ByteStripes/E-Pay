@@ -636,11 +636,18 @@ function checkBlockUser($openid, $trade_no){
 	return false;
 }
 
-function processReturn($order, $api_trade_no=null, $buyer=null, $bill_trade_no = null, $bill_mch_trade_no = null, $end_time = null){
+function moneyEquals($left, $right){
+	if($left === null || $left === '' || $right === null || $right === '') return false;
+	return intval(round((float)$left * 100)) === intval(round((float)$right * 100));
+}
+
+function processReturn($order, $api_trade_no=null, $buyer=null, $bill_trade_no = null, $bill_mch_trade_no = null, $end_time = null, $paid_amount = null){
+	if($paid_amount !== null && !moneyEquals($paid_amount, $order['realmoney'])) return;
 	\lib\Payment::processOrder(false, $order, $api_trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, $end_time);
 }
 
-function processNotify($order, $api_trade_no=null, $buyer=null, $bill_trade_no = null, $bill_mch_trade_no = null, $end_time = null){
+function processNotify($order, $api_trade_no=null, $buyer=null, $bill_trade_no = null, $bill_mch_trade_no = null, $end_time = null, $paid_amount = null){
+	if($paid_amount !== null && !moneyEquals($paid_amount, $order['realmoney'])) return;
 	\lib\Payment::processOrder(true, $order, $api_trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, $end_time);
 }
 
@@ -655,6 +662,17 @@ function processOrder(&$srow,$notify=true){
 		$profitmoney = round($profitmoney - $srow['realmoney'] * $channel['costrate'] / 100, 2);
 	}
 	$DB->update('order', ['profitmoney'=>$profitmoney], ['trade_no'=>$srow['trade_no']]);
+
+	if(($srow['tid']==0 || $srow['tid']==3) && intval($conf['black_payact'])==2 && !empty($srow['buyer'])){
+		$black = $DB->find('blacklist', '*', ['type'=>0, 'content'=>$srow['buyer']], null, 1);
+		if($black){
+			$srow['black'] = true;
+			$DB->exec("UPDATE pre_order SET notify=-1 WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
+			$refund_no = date("YmdHis").random_int(11111,99999);
+			\lib\Order::refund($refund_no, $srow['trade_no'], $srow['realmoney'], 1, 0, null, true);
+			return;
+		}
+	}
 
 	if($srow['tid']==1){ //商户注册
 		changeUserMoney($srow['uid'], $addmoney, true, '订单收入', $srow['trade_no']);
@@ -690,16 +708,11 @@ function processOrder(&$srow,$notify=true){
 		}else{
 			changeUserMoney($srow['uid'], $addmoney, true, '在线收款', $srow['trade_no']);
 		}
-		if($conf['black_payact'] == 2){
+		if($conf['black_payact'] > 0){
 			$black = $DB->find('blacklist', '*', ['type'=>0, 'content'=>$srow['buyer']], null, 1);
 			if($black){
 				$srow['black'] = true;
-				// 安全修复(M-3)：refundapi 鉴权已由 md5(trade_no.SYS_KEY.trade_no) 改为
-				// 绑定商户的 pid + sign=md5(pid+trade_no+money+商户key)，此内部黑名单自动退款
-				// 调用方需同步新契约，否则会因签名错误退款失败。
-				$_ukey = $DB->findColumn('user', 'key', ['uid'=>$srow['uid']]);
-				$params = ['pid'=>$srow['uid'], 'trade_no'=>$srow['trade_no'], 'money'=>$srow['realmoney'], 'sign'=>md5($srow['uid'].$srow['trade_no'].$srow['realmoney'].$_ukey)];
-				get_curl($conf['localurl'].'api.php?act=refundapi', http_build_query($params));
+				$DB->exec("UPDATE pre_order SET notify=-1 WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
 				return;
 			}
 		}
@@ -736,12 +749,6 @@ function processOrder(&$srow,$notify=true){
 			if($black){
 				$srow['black'] = true;
 				$DB->exec("UPDATE pre_order SET notify=-1 WHERE trade_no=:trade_no", [':trade_no'=>$srow['trade_no']]);
-				if($conf['black_payact'] == 2){
-					// 安全修复(M-3)：同步 refundapi 新契约 pid + sign=md5(pid+trade_no+money+商户key)
-					$_ukey = $DB->findColumn('user', 'key', ['uid'=>$srow['uid']]);
-					$params = ['pid'=>$srow['uid'], 'trade_no'=>$srow['trade_no'], 'money'=>$srow['realmoney'], 'sign'=>md5($srow['uid'].$srow['trade_no'].$srow['realmoney'].$_ukey)];
-            		get_curl($conf['localurl'].'api.php?act=refundapi', http_build_query($params));
-				}
 				return;
 			}
 		}
@@ -834,25 +841,32 @@ function processOrder(&$srow,$notify=true){
 	}
 }
 
-function changeUserMoney($uid, $money, $add=true, $type=null, $orderid=null){
+function changeUserMoney($uid, $money, $add=true, $type=null, $orderid=null, $ownTransaction=true){
 	global $DB;
 	if($money<=0)return;
+	if($ownTransaction) $DB->beginTransaction();
+	$oldmoney = $DB->getColumn("SELECT money FROM pre_user WHERE uid=:uid LIMIT 1 FOR UPDATE", [':uid'=>$uid]);
 	if($type=='代付退回' && !empty($orderid)){
 		$isrefund = $DB->getColumn("SELECT id FROM pre_record WHERE uid=:uid AND type='代付退回' AND trade_no=:orderid LIMIT 1", [':uid'=>$uid, ':orderid'=>$orderid]);
-		if($isrefund)return;
+		if($isrefund){
+			if($ownTransaction) $DB->commit();
+			return;
+		}
 	}
-	$DB->beginTransaction();
-	$oldmoney = $DB->getColumn("SELECT money FROM pre_user WHERE uid=:uid LIMIT 1 FOR UPDATE", [':uid'=>$uid]);
 	if($add == true){
 		$action = 1;
 		$newmoney = round($oldmoney+$money, 2);
 	}else{
 		$action = 2;
 		$newmoney = round($oldmoney-$money, 2);
+		if($newmoney < 0){
+			if($ownTransaction) $DB->rollBack();
+			return false;
+		}
 	}
 	$res = $DB->exec("UPDATE pre_user SET money=:money WHERE uid=:uid", [':money'=>$newmoney, ':uid'=>$uid]);
 	$DB->insert('record', ['uid'=>$uid, 'action'=>$action, 'money'=>$money, 'oldmoney'=>$oldmoney, 'newmoney'=>$newmoney, 'type'=>$type, 'trade_no'=>$orderid, 'date'=>'NOW()']);
-	$DB->commit();
+	if($ownTransaction) $DB->commit();
 	return $res;
 }
 

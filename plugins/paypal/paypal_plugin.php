@@ -141,8 +141,10 @@ class paypal_plugin
 			$out_trade_no = $captures['invoice_id'];
 			$buyer = $result['payer']['email_address'];
 
-			if((string)$out_trade_no === (string)TRADE_NO){
-				processReturn($order, $trade_no, $buyer);
+			$rate = !empty($channel['currency_rate']) ? $channel['currency_rate'] : 1;
+			$expect = round($order['realmoney'] * $rate, 2);
+			if((string)$out_trade_no === (string)TRADE_NO && moneyEquals($amount, $expect)){
+				processReturn($order, $trade_no, $buyer, null, null, null, $order['realmoney']);
 			}else{
 				return ['type'=>'error','msg'=>'订单信息校验失败'];
 			}
@@ -175,8 +177,13 @@ class paypal_plugin
         }
         $sign_string = $_SERVER['HTTP_PAYPAL_TRANSMISSION_ID'].'|'.$_SERVER['HTTP_PAYPAL_TRANSMISSION_TIME'].'|'.$channel['appsecret'].'|'.$crc32;
 
-        // 通过PAYPAL-CERT-URL头信息去拿公钥
-        $public_key = openssl_pkey_get_public(get_curl($_SERVER['HTTP_PAYPAL_CERT_URL']));
+        $certUrl = $_SERVER['HTTP_PAYPAL_CERT_URL'] ?? '';
+        $certHost = strtolower((string)parse_url($certUrl, PHP_URL_HOST));
+        $certScheme = strtolower((string)parse_url($certUrl, PHP_URL_SCHEME));
+        if($certScheme !== 'https' || !in_array($certHost, ['api.paypal.com', 'api.sandbox.paypal.com'], true)){
+            exit('证书地址无效');
+        }
+        $public_key = openssl_pkey_get_public(get_curl($certUrl));
         $details = openssl_pkey_get_details($public_key);
         $verify = openssl_verify($sign_string, base64_decode($_SERVER['HTTP_PAYPAL_TRANSMISSION_SIG']), $details['key'], 'SHA256');
         if($verify != 1)

@@ -1,5 +1,6 @@
 <?php
-$clientip=real_ip($conf['ip_type']?$conf['ip_type']:0);
+$ipType = (isset($conf['ip_type']) && $conf['ip_type'] !== '' && $conf['ip_type'] !== null) ? intval($conf['ip_type']) : 2;
+$clientip=real_ip($ipType);
 
 if(isset($_COOKIE["admin_token"]))
 {

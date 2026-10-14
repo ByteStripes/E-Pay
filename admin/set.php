@@ -432,7 +432,7 @@ $(document).ready(function(){
 	</div><br/>
 	<div class="form-group">
 	  <label class="col-sm-3 control-label">黑名单支付订单后操作</label>
-	  <div class="col-sm-9"><select class="form-control" name="black_payact" default="<?php echo $conf['black_payact']?>"><option value="0">无</option><option value="1">订单不回调</option></select><font color="green">仅适用于支付前黑名单账号无法拦截的支付方式</font></div>
+	  <div class="col-sm-9"><select class="form-control" name="black_payact" default="<?php echo $conf['black_payact']?>"><option value="0">无</option><option value="1">订单不回调</option><option value="2">不入账并原路退款</option></select><font color="green">仅适用于支付前黑名单账号无法拦截的支付方式</font></div>
 	</div><br/>
 	<div class="form-group">
 	  <label class="col-sm-3 control-label">支付宝&微信分账描述</label>

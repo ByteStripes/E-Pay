@@ -475,7 +475,7 @@ class lakala_plugin
 
 		try{
 			$result = $client->execute('/api/v3/labs/trans/micropay', $params);
-			if($client->res_code == 'BBS00000'){
+			if($client->res_code == 'BBS00000' && intval($result['total_amount'] ?? 0) === intval(round($order['realmoney']*100))){
 				$buyer = isset($result['acc_resp_fields']['open_id'])?$result['acc_resp_fields']['open_id']:$result['acc_resp_fields']['user_id'];
 				processNotify($order, $result['trade_no'], $buyer, $result['acc_trade_no']);
 				return ['type'=>'scan','data'=>['type'=>$order['typename'], 'trade_no'=>$result['out_trade_no'], 'api_trade_no'=>$result['trade_no'], 'buyer'=>$buyer, 'money'=>strval(round($result['total_amount']/100, 2))]];
@@ -497,8 +497,8 @@ class lakala_plugin
 					}
 					$retry++;
 				}
-				if($success){
-					processNotify($order, $result['trade_no'], $result['user_id2'], $result['acc_trade_no']);
+				if($success && intval($result['total_amount'] ?? 0) === intval(round($order['realmoney']*100))){
+					processNotify($order, $result['trade_no'], $result['user_id2'], $result['acc_trade_no'], null, null, $order['realmoney']);
 					return ['type'=>'scan','data'=>['type'=>$order['typename'], 'trade_no'=>$result['out_trade_no'], 'api_trade_no'=>$result['trade_no'], 'buyer'=>$result['user_id2'], 'money'=>strval(round($result['total_amount']/100, 2))]];
 				}else{
 					try{
@@ -568,8 +568,8 @@ class lakala_plugin
 			$bill_trade_no = $data['acc_trade_no'];
 
 			if($data['trade_status'] == 'SUCCESS'){
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && intval($total_amount) === intval(round($order['realmoney']*100))){
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 				}
 			}
 			return ['type'=>'html','data'=>'success'];
@@ -609,8 +609,8 @@ class lakala_plugin
 			$bill_trade_no = $data['order_trade_info']['acc_trade_no'];
 
 			if($data['order_status'] == '2'){
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && intval($total_amount) === intval(round($order['realmoney']*100))){
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 				}
 			}
 			return ['type'=>'html','data'=>'success'];

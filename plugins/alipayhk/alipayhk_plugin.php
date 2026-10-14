@@ -230,9 +230,10 @@ class alipayhk_plugin
 			//交易金额
 			$total_fee = $_POST['total_fee'];
 
+			$rmbFee = $_POST['rmb_fee'] ?? null;
 			if ($_POST['trade_status'] == 'TRADE_FINISHED' || $_POST['trade_status'] == 'TRADE_SUCCESS') {
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $trade_no, $buyer_id);
+				if((string)$out_trade_no === (string)TRADE_NO && moneyEquals($rmbFee, $order['realmoney'])){
+					processNotify($order, $trade_no, $buyer_id, null, null, null, $rmbFee);
 				}
 			}
 			return ['type'=>'html','data'=>'success'];
@@ -266,9 +267,10 @@ class alipayhk_plugin
 			//交易金额
 			$total_fee = $_GET['total_fee'];
 
+			$rmbFee = $_GET['rmb_fee'] ?? null;
 			if($_GET['trade_status'] == 'TRADE_FINISHED' || $_GET['trade_status'] == 'TRADE_SUCCESS') {
-				if((string)$out_trade_no === (string)TRADE_NO){
-                    processReturn($order, $trade_no, $buyer_id);
+				if((string)$out_trade_no === (string)TRADE_NO && moneyEquals($rmbFee, $order['realmoney'])){
+                    processReturn($order, $trade_no, $buyer_id, null, null, null, $rmbFee);
                 }else{
 					return ['type'=>'error','msg'=>'订单信息校验失败'];
 				}

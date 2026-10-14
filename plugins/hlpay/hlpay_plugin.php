@@ -368,8 +368,8 @@ class hlpay_plugin
 				$trade_no = $data['payOrderNo'];
 				$bill_trade_no = $data['channelOrderNo'];
 				$bill_mch_trade_no = $data['instOrderNo'];
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $trade_no, null, $bill_trade_no, $bill_mch_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && moneyEquals($data['amount'] ?? null, $order['realmoney'])){
+					processNotify($order, $trade_no, null, $bill_trade_no, $bill_mch_trade_no, null, $data['amount']);
 				}
 				return ['type'=>'html','data'=>'success'];
 			}

@@ -612,8 +612,8 @@ class yinyingtong_plugin
 				$ext = unserialize($order['ext']);
 				$ext['transcode'] = $data['transcode'];
 
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $null, $bill_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
+					processNotify($order, $api_trade_no, $null, $bill_trade_no, null, null, $money);
 					\lib\Payment::updateOrderExt(TRADE_NO, $ext);
 				}
 			}
@@ -644,8 +644,8 @@ class yinyingtong_plugin
 				$bill_mch_trade_no = $data['biz_content']['data'][0]['bank_order_id'];
 				$buyer = $data['biz_content']['data'][0]['bank_user_id'];
 
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $buyer, null, $bill_mch_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
+					processNotify($order, $api_trade_no, $buyer, null, $bill_mch_trade_no, null, $money);
 				}
 			}
 			return ['type'=>'html','data'=>'success'];

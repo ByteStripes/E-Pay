@@ -113,14 +113,15 @@ class Transfer
             }
         }
         
+        $deferred = false;
         if($channelid == -1){
             $result = ['code'=>0, 'status'=>3, 'orderid'=>null, 'biz_no'=>$biz_no, 'out_biz_no'=>$out_biz_no];
         }else{
-            $result = self::submit($type, $channel, $biz_no, $payee_account, $payee_real_name, $money, $title, $desc);
-            $result['biz_no'] = $biz_no;
-            $result['out_biz_no'] = $out_biz_no;
+            $deferred = true;
+            $result = ['code'=>0, 'status'=>0, 'orderid'=>null, 'biz_no'=>$biz_no, 'out_biz_no'=>$out_biz_no];
         }
 
+        $id = false;
         if($result['code']==0){
             $paytime = $result['status'] == 1 ? 'NOW()' : null;
             $data = ['biz_no'=>$biz_no, 'out_biz_no'=>$out_biz_no, 'uid'=>$uid, 'type'=>$type, 'channel'=>$channelid, 'account'=>$payee_account, 'username'=>$payee_real_name, 'money'=>$money, 'costmoney'=>$need_money??$money, 'addtime'=>'NOW()', 'paytime'=>$paytime, 'pay_order_no'=>$result['orderid'], 'status'=>$result['status'], 'desc'=>$title?$title:$desc];
@@ -130,19 +131,49 @@ class Transfer
                 changeUserMoney2($uid, $userrow['money'], $need_money, false, '代付', $biz_no);
                 $result['cost_money'] = $need_money;
             }
+        }
+        $DB->commit();
+
+        if($result['code']==0 && $id===false){
+            return ['code'=>-1, 'msg'=>'创建转账记录失败', 'biz_no'=>$biz_no, 'out_biz_no'=>$out_biz_no];
+        }
+
+        if($deferred && $id){
+            try{
+                $upstream = self::submit($type, $channel, $biz_no, $payee_account, $payee_real_name, $money, $title, $desc);
+            }catch(\Throwable $e){
+                $upstream = ['code'=>-1, 'msg'=>$e->getMessage()];
+            }
+            $upstream['biz_no'] = $biz_no;
+            $upstream['out_biz_no'] = $out_biz_no;
+            if(($upstream['code'] ?? -1) != 0){
+                $DB->exec("UPDATE pre_transfer SET status=2, result=:result WHERE biz_no=:biz_no AND status=0", [':result'=>$upstream['msg'] ?? '转账失败', ':biz_no'=>$biz_no]);
+                if($need_money>0){
+                    changeUserMoney($uid, $need_money, true, '代付退回', $biz_no);
+                }
+                return ['code'=>-1, 'msg'=>$upstream['msg'] ?? '转账失败', 'biz_no'=>$biz_no, 'out_biz_no'=>$out_biz_no];
+            }
+            $paytime = ($upstream['status'] ?? 0) == 1 ? date('Y-m-d H:i:s') : null;
+            $update = ['status'=>$upstream['status'], 'pay_order_no'=>$upstream['orderid'] ?? null, 'paytime'=>$paytime];
+            if(isset($upstream['wxpackage'])) $update['ext'] = $upstream['wxpackage'];
+            $DB->update('transfer', $update, ['biz_no'=>$biz_no]);
+            $result = $upstream;
+            if($need_money>0) $result['cost_money'] = $need_money;
+        }
+
+        if(($result['code'] ?? -1)==0){
             if($result['status'] == 1){
-                $result['msg']='转账成功！转账单据号:'.$result['orderid'].' 支付时间:'.$result['paydate'];
+                $result['msg']='转账成功！转账单据号:'.$result['orderid'].' 支付时间:'.($result['paydate'] ?? '');
             }elseif($result['status'] == 3){
                 $result['msg']='提交成功！请等待管理员审核转账。';
             }elseif(isset($result['wxpackage'])){
                 $jumpurl = $siteurl.'paypage/wxtrans.php?type=transfer&id='.$id;
-                $result['msg']='提交成功！请在微信打开 '.$jumpurl.' 确认收款。转账单据号:'.$result['orderid'].' 支付时间:'.$result['paydate'];
+                $result['msg']='提交成功！请在微信打开 '.$jumpurl.' 确认收款。转账单据号:'.$result['orderid'].' 支付时间:'.($result['paydate'] ?? '');
                 $result['jumpurl'] = $jumpurl;
             }else{
-                $result['msg']='提交成功！转账处理中。转账单据号:'.$result['orderid'].' 支付时间:'.$result['paydate'];
+                $result['msg']='提交成功！转账处理中。转账单据号:'.($result['orderid'] ?? '').' 支付时间:'.($result['paydate'] ?? '');
             }
         }
-        $DB->commit();
         return $result;
     }
 
@@ -163,7 +194,7 @@ class Transfer
         if($result['code'] == 0){
             if($result['status'] == 2){
                 if($order['status'] == 0 || $order['status'] == 3){
-                    $resCount = $DB->update('transfer', ['status'=>2, 'result'=>$result['errmsg']], ['biz_no' => $biz_no]);
+                    $resCount = $DB->exec("UPDATE pre_transfer SET status=2, result=:result WHERE biz_no=:biz_no AND status IN (0,3)", [':result'=>$result['errmsg'], ':biz_no'=>$biz_no]);
                     if($order['uid'] > 0 && $resCount > 0){
                         changeUserMoney($order['uid'], $order['costmoney'], true, '代付退回', $biz_no);
                     }
@@ -213,7 +244,7 @@ class Transfer
         ];
         $result = \lib\Plugin::call('transfer_cancel', $channel, $bizParam);
         if($result['code'] == 0){
-            $resCount = $DB->update('transfer', ['status'=>2, 'result'=>'转账已撤销'], ['biz_no' => $biz_no]);
+            $resCount = $DB->exec("UPDATE pre_transfer SET status=2, result='转账已撤销' WHERE biz_no=:biz_no AND status IN (0,3)", [':biz_no'=>$biz_no]);
             if($order['uid'] > 0 && $resCount > 0){
                 changeUserMoney($order['uid'], $order['costmoney'], true, '代付退回', $biz_no);
             }

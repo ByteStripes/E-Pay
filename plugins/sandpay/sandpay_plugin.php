@@ -385,8 +385,8 @@ class sandpay_plugin
 				$buyer = $array['payer']['payerAccNo'];
 				$bill_trade_no = $array['channelOrderNo'];
 				$bill_mch_trade_no = $array['channelSerialNo'];
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])){
+					processNotify($order, $trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, null, $money);
 				}
 				return ['type'=>'html','data'=>'respCode=000000'];
 			}

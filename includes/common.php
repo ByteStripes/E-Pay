@@ -15,8 +15,8 @@ $date = date("Y-m-d H:i:s");
 
 // Session 安全配置
 ini_set('session.cookie_httponly', '1');
-// FIXME(local-http-test): 本地 HTTP 部署测试临时置 0，生产 HTTPS 环境应改回 '1'
-ini_set('session.cookie_secure', '0');
+$cookieSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+ini_set('session.cookie_secure', $cookieSecure ? '1' : '0');
 ini_set('session.cookie_samesite', 'Strict');
 ini_set('session.use_strict_mode', '1');
 ini_set('session.use_only_cookies', '1');

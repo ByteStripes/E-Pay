@@ -467,17 +467,21 @@ class wxpayn_plugin
 		if(isset($data['combine_out_trade_no'])){ //合单支付
 			if((string)$data['combine_out_trade_no'] === (string)TRADE_NO){
 				$sub_orders = [];
+				$paidFen = 0;
 				foreach($data['sub_orders'] as $detail){
+					$paidFen += intval($detail['amount']['total_amount'] ?? 0);
 					$sub_orders[] = ['sub_trade_no'=>$detail['out_trade_no'], 'api_trade_no'=>$detail['transaction_id'], 'money'=>round($detail['amount']['total_amount']/100,2)];
 				}
-				\lib\Payment::processSubOrders(TRADE_NO, $sub_orders);
-
-				processNotify($order, $data['combine_out_trade_no'], $data['combine_payer_info']['openid']);
+				if($paidFen === intval(round($order['realmoney']*100))){
+					\lib\Payment::processSubOrders(TRADE_NO, $sub_orders);
+					processNotify($order, $data['combine_out_trade_no'], $data['combine_payer_info']['openid'], null, null, null, $order['realmoney']);
+				}
 			}
 		}else{
 			if ($data['trade_state'] == 'SUCCESS') {
-				if((string)$data['out_trade_no'] === (string)TRADE_NO){
-					processNotify($order, $data['transaction_id'], $data['payer']['openid']);
+				$paidFen = $data['amount']['total'] ?? null;
+				if((string)$data['out_trade_no'] === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))){
+					processNotify($order, $data['transaction_id'], $data['payer']['openid'], null, null, null, $order['realmoney']);
 				}
 			}
 		}

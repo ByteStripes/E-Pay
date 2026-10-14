@@ -870,7 +870,7 @@ class huifu_plugin
 
 		if($client->checkNotifySign($_POST['resp_data'], $_POST['sign'])){
 			if ($data['trans_stat'] == 'S') {
-				if((string)$data['req_seq_id'] === (string)TRADE_NO){
+				if((string)$data['req_seq_id'] === (string)TRADE_NO && moneyEquals($data['trans_amt'] ?? null, $order['realmoney'])){
 					$api_trade_no = $data['hf_seq_id'];
 					$bill_trade_no = $data['out_trans_id'];
 					$bill_mch_trade_no = $data['party_order_id'];

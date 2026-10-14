@@ -475,8 +475,8 @@ class allinpay_plugin
 				$money = $_POST['initamt'];
 				$buyer = $_POST['acct'];
 				$bill_trade_no = $_POST['chnltrxid'];
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && moneyEquals(round(((float)$money)/100, 2), $order['realmoney'])){
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 				}
 			}
 			return ['type'=>'html','data'=>'success'];

@@ -346,8 +346,8 @@ class lakalamoss_plugin
 			$money = $data['total_amount'];
 			$buyer = $data['user_id2'];
 			$bill_trade_no = $data['acc_trade_no'];
-			if((string)$out_trade_no === (string)TRADE_NO){
-				processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+			if((string)$out_trade_no === (string)TRADE_NO && intval($money) === intval(round($order['realmoney']*100))){
+				processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 			}
 		}
 		$client->echoNotify($arr['head'], true);

@@ -493,8 +493,8 @@ class easypay_plugin
 				$money = $data['respOrderInfo']['transAmount'];
 				$buyer = $data['respOrderInfo']['userId'];
 				$bill_trade_no = $data['respOrderInfo']['pcTrace'];
-				if((string)$out_trade_no === (string)TRADE_NO){
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				if((string)$out_trade_no === (string)TRADE_NO && intval($money) === intval(round($order['realmoney']*100))){
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 				}
 			}
 			return ['type'=>'json','data'=>['code'=>'000000','msg'=>'Success']];

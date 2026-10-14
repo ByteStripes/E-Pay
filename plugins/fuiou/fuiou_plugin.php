@@ -379,8 +379,8 @@ class fuiou_plugin
 			$money = $arr['order_amt'];
 			$buyer = $arr['reserved_buyer_logon_id'];
 			$bill_mch_trade_no = $arr['reserved_channel_order_id'];
-			if((string)$out_trade_no === (string)TRADE_NO){
-				processNotify($order, $trade_no, $buyer, null, $bill_mch_trade_no);
+			if((string)$out_trade_no === (string)TRADE_NO && intval($money) === intval(round($order['realmoney']*100))){
+				processNotify($order, $trade_no, $buyer, null, $bill_mch_trade_no, null, $order['realmoney']);
 			}
 			return ['type'=>'html','data'=>'1'];
         }else{

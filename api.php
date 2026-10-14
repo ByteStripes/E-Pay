@@ -25,7 +25,7 @@ if($act=='query')
 	$order_today=$DB->getColumn("SELECT count(*) from pre_order where uid=:uid and status=1 and date=:today", [':uid'=>$pid, ':today'=>$today]);
 	$order_lastday=$DB->getColumn("SELECT count(*) from pre_order where uid=:uid and status=1 and date=:lastday", [':uid'=>$pid, ':lastday'=>$lastday]);
 
-	$result=array("code"=>1,"pid"=>$pid,"key"=>$key,"active"=>$userrow['status'],"money"=>$userrow['money'],"type"=>$userrow['settle_id'],"account"=>$userrow['account'],"username"=>$userrow['username'],"orders"=>$orders,"orders_today"=>$order_today,"orders_lastday"=>$order_lastday);
+	$result=array("code"=>1,"pid"=>$pid,"active"=>$userrow['status'],"money"=>$userrow['money'],"type"=>$userrow['settle_id'],"account"=>$userrow['account'],"username"=>$userrow['username'],"orders"=>$orders,"orders_today"=>$order_today,"orders_lastday"=>$order_lastday);
 	exit(json_encode($result));
 }
 elseif($act=='settle')
@@ -59,11 +59,10 @@ elseif($act=='order')
 		if($timestamp > 0 && abs(time() - $timestamp) > 300){
 			exit(json_encode(['code'=>-4, 'msg'=>'request expired']));
 		}
-		if($timestamp > 0){
-			$expected_sign = md5(SYS_KEY.$trade_no.$timestamp.SYS_KEY);
-		} else {
-			$expected_sign = md5(SYS_KEY.$trade_no.SYS_KEY);
+		if($timestamp <= 0){
+			exit(json_encode(['code'=>-4, 'msg'=>'request expired']));
 		}
+		$expected_sign = md5(SYS_KEY.$trade_no.$timestamp.SYS_KEY);
 		if(empty($_GET['sign']) || $expected_sign !== $_GET['sign'])
 			exit(json_encode(['code'=>-3, 'msg'=>'verify sign failed']));
 		$row=$DB->getRow("SELECT * FROM pre_order WHERE trade_no=:trade_no limit 1", [':trade_no'=>$trade_no]);

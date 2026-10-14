@@ -505,8 +505,9 @@ class kuaiqian_plugin
 
 		if($verify_result) {//验证成功
 			if ($_GET['payResult'] == '10') {
-				if((string)$_GET['orderId'] === (string)TRADE_NO){
-					processNotify($order, $_GET['dealId']);
+				$paidFen = $_GET['orderAmount'] ?? $_GET['payAmount'] ?? null;
+				if((string)$_GET['orderId'] === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))){
+					processNotify($order, $_GET['dealId'], null, null, null, null, $order['realmoney']);
 				}
 			}
 			$redirecturl = $siteurl.'pay/return/'.TRADE_NO.'/';
@@ -531,8 +532,9 @@ class kuaiqian_plugin
 		}
 
 		if($result['body']['orderStatus'] == 'S'){
-			if((string)$result['head']['externalRefNumber'] === (string)TRADE_NO){
-				processNotify($order, $result['body']['idOrderCtrl'], $result['body']['thirdPartyBuyerId']);
+			$paidFen = $result['body']['amount'] ?? null;
+			if((string)$result['head']['externalRefNumber'] === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))){
+				processNotify($order, $result['body']['idOrderCtrl'], $result['body']['thirdPartyBuyerId'], null, null, null, $order['realmoney']);
 			}
 		}
 

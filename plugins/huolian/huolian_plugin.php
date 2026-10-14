@@ -362,8 +362,8 @@ class huolian_plugin
 				$bill_trade_no = $data['topChannelOrderNo'];
 				$bill_mch_trade_no = $data['channelOrderNo'];
 
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no);
+				if ((string)$out_trade_no === (string)TRADE_NO && moneyEquals($money, $order['realmoney'])) {
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, $bill_mch_trade_no, null, $money);
 				}
 				return ['type'=>'html','data'=>'SUCCESS'];
 			}else{

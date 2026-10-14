@@ -401,8 +401,8 @@ class suixingpay_plugin
 		if($verify_result) {//验证成功
 
 			if ($arr['bizCode'] == '0000') {
-				if((string)$arr['ordNo'] === (string)TRADE_NO){
-					processNotify($order, $arr['sxfUuid'], $arr['buyerId'], $arr['transactionId']);
+				if((string)$arr['ordNo'] === (string)TRADE_NO && moneyEquals($arr['amt'] ?? null, $order['realmoney'])){
+					processNotify($order, $arr['sxfUuid'], $arr['buyerId'], $arr['transactionId'], null, null, $arr['amt']);
 				}
 				return ['type'=>'html','data'=>'{"code":"success","msg":"成功"}'];
 			}else{

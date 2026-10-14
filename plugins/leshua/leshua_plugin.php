@@ -374,8 +374,9 @@ class leshua_plugin
 				$buyer = $arr['sub_openid'];
 				$bill_trade_no = $arr['out_transaction_id'];
 	
-				if ((string)$out_trade_no === (string)TRADE_NO) {
-					processNotify($order, $api_trade_no, $buyer, $bill_trade_no);
+				$paidFen = $arr['amount'] ?? null;
+				if ((string)$out_trade_no === (string)TRADE_NO && intval($paidFen) === intval(round($order['realmoney']*100))) {
+					processNotify($order, $api_trade_no, $buyer, $bill_trade_no, null, null, $order['realmoney']);
 				}
 			}
 			return ['type'=>'html','data'=>'000000'];

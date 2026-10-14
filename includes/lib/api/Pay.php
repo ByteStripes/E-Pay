@@ -289,6 +289,7 @@ class Pay
         $return_url=htmlspecialchars(daddslashes($queryArr['return_url']));
         $name=htmlspecialchars(daddslashes($queryArr['name']));
         $money=daddslashes($queryArr['money']);
+        $linkIp = $clientip;
         $clientip=daddslashes($queryArr['clientip']);
         $device=$queryArr['device'];
         if(empty($device))$device = 'pc';
@@ -380,6 +381,9 @@ class Pay
         }
 
         $blackip = $DB->find('blacklist', '*', ['type'=>1, 'content'=>$clientip], null, 1);
+        if(!$blackip && $linkIp !== '' && $linkIp !== $clientip){
+            $blackip = $DB->find('blacklist', '*', ['type'=>1, 'content'=>$linkIp], null, 1);
+        }
         if($blackip)echojsonmsg('系统异常无法完成付款');
 
         if($conf['pay_daymax'] > 0){

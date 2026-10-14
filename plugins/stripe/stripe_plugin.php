@@ -238,20 +238,29 @@ class stripe_plugin
 			return ['type'=>'html','data'=>$e->getMessage()];
 		}
 
+		$rate = !empty($channel['currency_rate']) ? $channel['currency_rate'] : 1;
+		$expectFen = intval(round($order['realmoney'] * $rate * 100));
 		switch($event['type']){
 			case 'checkout.session.completed':
 				$session = $event['data']['object'];
-				if ($session['payment_status'] == 'paid') {
-					processNotify($order, $session['payment_intent']);
+				$paidFen = intval($session['amount_total'] ?? 0);
+				if ($session['payment_status'] == 'paid' && $paidFen === $expectFen) {
+					processNotify($order, $session['payment_intent'], null, null, null, null, $order['realmoney']);
 				}
 				break;
 			case 'checkout.session.async_payment_succeeded':
 				$session = $event['data']['object'];
-				processNotify($order, $session['payment_intent']);
+				$paidFen = intval($session['amount_total'] ?? 0);
+				if($paidFen === $expectFen){
+					processNotify($order, $session['payment_intent'], null, null, null, null, $order['realmoney']);
+				}
 				break;
 			case 'payment_intent.succeeded':
 				$session = $event['data']['object'];
-				processNotify($order, $session['id']);
+				$paidFen = intval($session['amount_received'] ?? $session['amount'] ?? 0);
+				if($paidFen === $expectFen){
+					processNotify($order, $session['id'], null, null, null, null, $order['realmoney']);
+				}
 				break;
 		}
 		return ['type'=>'html','data'=>'success'];
